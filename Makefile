@@ -16,7 +16,7 @@ TEST_SRC = $(TEST_DIR)/src
 SOURCES = $(wildcard $(SRC_DIR)/*.cpp)
 OBJECTS = $(patsubst %.cpp, %.o, $(SOURCES))
 TEST_SOURCES = $(wildcard $(TEST_SRC)/*.cpp)
-TEST_OBJECTS = $(patsubst %.cpp, %.o, $(SOURCES))
+TEST_OBJECTS = $(patsubst %.cpp, %.o, $(TEST_SOURCES))
 HEADERS = $(wildcard $(SRC_DIR)/*.h)
 
 # Please tweak the following variable definitions as needed by your
@@ -30,14 +30,14 @@ GTEST_DIR = gtest/googletest/googletest
 # Flags passed to the preprocessor.
 # Set Google Test's header directory as a system directory, such that
 # the compiler doesn't generate warnings in Google Test headers.
-CPPFLAGS += -isystem $(GTEST_DIR)/include
+CPPFLAGS += -isystem $(GTEST_DIR)/include -I$(SRC_DIR)
 
 # Gtest-needed flags passed to the C++ compiler.
 CXXFLAGS += -g -Wall -Wextra -pthread
 
 # All tests produced by this Makefile.  Remember to add new tests you
 # created to the list.
-TESTS = sample1_unittest
+TESTS = test_util
 
 # All Google Test headers.  Usually you shouldn't change this
 # definition.
@@ -47,14 +47,25 @@ GTEST_HEADERS = $(GTEST_DIR)/include/gtest/*.h \
 default: $(TARGET)
 all: $(TARGET) $(TESTS)
 
-
 # Dependency generation
+# IF YOU MODIFY HERE, CHECK THAT E.G. TOUCHING A HEADER CAUSES REBUILD OF DEPENDENT CPP FILES!
+# In particular, check that the .d files have targets of type 'kalle.o kalle.d: <deps>'
 
-%.d: %.cpp
-	set -e; rm -f $@; \
-         $(CXX) -MM $(CXXFLAGS) -I$(GTEST_DIR)/include -I$(SRC_DIR) $< > $@.$$$$; \
-         sed 's,\($*\)\.o[ :]*,\1.o $@ : ,g' < $@.$$$$ > $@; \
+$(SRC_DIR)/%.d: $(SRC_DIR)/%.cpp
+	@set -e; rm -f $@; \
+         $(CXX) -MM $(CPPFLAGS) $(CXXFLAGS) -I$(GTEST_DIR)/include $< > $@.$$$$; \
+         sed 's,\($*\)\.o[ :]*,$(SRC_DIR)/\1.o $@ : ,g' < $@.$$$$ > $@; \
 	rm -f $@.$$$$
+
+$(TEST_SRC)/%.d: $(TEST_SRC)/%.cpp
+	@set -e; rm -f $@; \
+         $(CXX) -MM $(CPPFLAGS) $(CXXFLAGS) -I$(GTEST_DIR)/include $< > $@.$$$$; \
+         sed 's,\($*\)\.o[ :]*,$(TEST_SRC)/\1.o $@ : ,g' < $@.$$$$ > $@; \
+	rm -f $@.$$$$
+
+# Pattern rule
+%.o: %.cpp
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -O0 -isystem $(GTEST_DIR)/include -c $< -o $@
 
 include $(SOURCES:.cpp=.d)
 include $(TEST_SOURCES:.cpp=.d)
@@ -96,9 +107,5 @@ gtest_main.a: gtest-all.o gtest_main.o
 # gtest_main.a, depending on whether it defines its own main()
 # function.
 
-test_util.o: $(TEST_SRC)/test_util.cpp \
-                     $(SRC_DIR)/util.h $(GTEST_HEADERS)
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -isystem $(GTEST_DIR)/include -c $(TEST_SRC)/test_util.cpp
-
-test_util: util.o test_util.o gtest_main.a
+test_util: src/util.o src/gpl_code_remove.o $(TEST_OBJECTS) gtest_main.a
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@
