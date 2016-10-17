@@ -14,22 +14,6 @@ using std::stoi;
 using std::cout;
 using std::string;
 
-void send_packet(int domain, string address, in_port_t port, int sock)
-{
-    const size_t BUFLEN = 10;
-    char buf[BUFLEN];
-    int result;
-
-    sockaddr_storage ss;
-    create_sockaddr_storage(domain, address, port, &ss);
-
-    cout << "Sending, ip addr " << address << " domain " << (domain == AF_INET ? "AF_INET" : "AF_INET6") << '\n';
-    result = sendto(sock, buf, BUFLEN, 0, (sockaddr *)&ss, sizeof(ss));
-    if (result < 0)
-    {
-        throw std::system_error(errno, std::system_category());
-    }
-}
 
 int main(int argc, char *argv[])
 {
@@ -62,7 +46,7 @@ int main(int argc, char *argv[])
 
         for (; nr_packets; nr_packets--)
         {
-            send_packet(domain, address, port, sock);
+            sendpacket(domain, address, port, sock);
             wait_for_errqueue_data(sock);
             receive_send_timestamp(sock);
             cout << "Sleeping...\n";

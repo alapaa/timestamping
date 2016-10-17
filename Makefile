@@ -1,8 +1,9 @@
-TARGET = sender
+SENDER = sender
+RECEIVER = receiver
 LIBS =
 
 CXX = g++
-CXXFLAGS = -std=c++11
+CXXFLAGS = -std=c++11 -DDEBUG
 
 .PHONY: default all clean
 
@@ -44,8 +45,8 @@ TESTS = test_util
 GTEST_HEADERS = $(GTEST_DIR)/include/gtest/*.h \
                 $(GTEST_DIR)/include/gtest/internal/*.h
 
-default: $(TARGET)
-all: $(TARGET) $(TESTS)
+default: all
+all: $(SENDER) $(RECEIVER) $(TESTS)
 
 # Dependency generation
 # IF YOU MODIFY HERE, CHECK THAT E.G. TOUCHING A HEADER CAUSES REBUILD OF DEPENDENT CPP FILES!
@@ -72,8 +73,13 @@ include $(TEST_SOURCES:.cpp=.d)
 
 .PRECIOUS: $(TARGET) $(OBJECTS)
 
-$(TARGET): $(OBJECTS)
-	$(CXX) $(OBJECTS) -Wall $(LIBS) -o $@
+S_OBJ = $(filter-out ./src/receiver.o, $(OBJECTS))
+$(SENDER): $(S_OBJ)
+	$(CXX) $(S_OBJ) -Wall $(LIBS) -o $@
+
+R_OBJ = $(filter-out ./src/sender.o, $(OBJECTS))
+$(RECEIVER): $(R_OBJ)
+	$(CXX) $(R_OBJ) -Wall $(LIBS) -o $@
 
 clean:
 	-rm -f $(SRC_DIR)/*.o $(SRC_DIR)/*.d $(TEST_SRC)/*.o $(TEST_SRC)/*.d

@@ -6,6 +6,7 @@
 #include <errno.h>
 #include <cstring>
 
+#include <fcntl.h>
 #include <sys/time.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>
@@ -23,6 +24,23 @@
 
 using std::cout;
 
+void do_bind(int sock, sockaddr_storage *ss)
+{
+    int result = bind(sock, (sockaddr *)ss, sizeof(*ss));
+    if (result == -1)
+    {
+        throw std::system_error(errno, std::system_category());
+    }
+}
+
+void set_nonblocking(int sock)
+{
+    int nonblock = 1;
+    if (fcntl(sock, F_SETFL, O_NONBLOCK, nonblock) == -1)
+    {
+        throw std::system_error(errno, std::system_category());
+    }
+}
 
 void setup_device(int sock, string iface_name, int so_timestamping_flags)
 {
@@ -109,17 +127,58 @@ int setup_socket(int domain, int type, int so_timestamping_flags)
     return sock;
 }
 
-static void recvpacket(int sock, int recvmsg_flags)
+
+void sendpacket(int domain, string address, in_port_t port, int sock)
 {
-    char data[256];
-    struct msghdr msg;
-    struct iovec entry;
-    struct sockaddr_in from_addr;
+    const size_t BUFLEN = 1472;
+    char buf[BUFLEN];
+
+    sockaddr_storage ss;
+    create_sockaddr_storage(domain, address, port, &ss);
+
+    cout << "Sending, ip addr " << address << " domain " << (domain == AF_INET ? "AF_INET" : "AF_INET6") << '\n';
+    sendpacket(&ss, sock, buf, BUFLEN);
+}
+
+void sendpacket(sockaddr_storage *ss, int sock, char *buf, size_t buflen)
+{
+    int result;
+
+
+#ifdef DEBUG
+    char addrstr[INET_ADDRSTRLEN];
+    const char *resbuf = inet_ntop(ss->ss_family, &((sockaddr_in *)ss)->sin_addr, addrstr, sizeof(addrstr));
+    if (!resbuf)
+    {
+        throw std::system_error(errno, std::system_category());
+    }
+    cout << "Sending to " << addrstr << '\n';
+#endif
+
+    result = sendto(sock, buf, buflen, 0, (sockaddr *)ss, sizeof(*ss));
+    if (result == -1)
+    {
+        throw std::system_error(errno, std::system_category());
+    }
+}
+
+void recvpacket(int sock, int recvmsg_flags, char **databuf = nullptr, int *data_len = nullptr,
+                sockaddr_storage **ss = nullptr)
+{
+    const size_t MAX_LEN = 1472;
+    char data[MAX_LEN];
+    msghdr msg;
+    iovec entry;
+    sockaddr_storage from_addr;
     struct {
         struct cmsghdr cm;
         char control[512];
     } control;
-    int res;
+    int len;
+
+    *databuf = 0;
+    *data_len = 0;
+    *ss = 0;
 
     memset(&msg, 0, sizeof(msg));
     msg.msg_iov = &entry;
@@ -131,16 +190,29 @@ static void recvpacket(int sock, int recvmsg_flags)
     msg.msg_control = &control;
     msg.msg_controllen = sizeof(control);
 
-    res = recvmsg(sock, &msg, recvmsg_flags|MSG_DONTWAIT);
-    if (res == -1)
+    len = recvmsg(sock, &msg, recvmsg_flags);
+    if (len == -1)
     {
         throw std::system_error(errno, std::system_category());
     }
+    else if (msg.msg_flags & MSG_TRUNC)
+    {
+        throw std::runtime_error("recvmsg, buffer too small, truncated!");
+    }
     else
     {
-        printpacket(&msg, res, data,
+        printpacket(&msg, len, data,
                 sock, recvmsg_flags,
                 0, 0);
+        if (databuf)
+        {
+            *databuf = data;
+            *data_len = len;
+        }
+        if (ss)
+        {
+            *ss = &from_addr;
+        }
     }
 }
 
