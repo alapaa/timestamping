@@ -14,7 +14,6 @@ using std::stoi;
 using std::cout;
 using std::string;
 
-
 int main(int argc, char *argv[])
 {
     int nr_packets = 0;
@@ -25,11 +24,14 @@ int main(int argc, char *argv[])
     int ipver = 0;
     string iface_name;
 
+    const size_t BUFLEN = 1472;
+    char buf[BUFLEN];
+
     try
     {
         if (argc != 6)
         {
-            throw std::runtime_error("Usage: sender <ip addr> <port> <ip ver (4 or 6)> <nr of packets>" "<iface>");
+            throw std::runtime_error("Usage: sender <ip addr> <port> <ip ver (4 or 6)> <nr of packets> <iface>");
         }
         else
         {
@@ -46,7 +48,7 @@ int main(int argc, char *argv[])
 
         for (; nr_packets; nr_packets--)
         {
-            sendpacket(domain, address, port, sock);
+            sendpacket(domain, address, port, sock, buf, BUFLEN);
             wait_for_errqueue_data(sock);
             receive_send_timestamp(sock);
             cout << "Sleeping...\n";

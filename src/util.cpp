@@ -7,6 +7,7 @@
 #include <cstring>
 
 #include <fcntl.h>
+#include <unistd.h>
 #include <sys/time.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>
@@ -23,6 +24,35 @@
 #include "gpl_code_remove.h"
 
 using std::cout;
+using std::tuple;
+using std::shared_ptr;
+
+void check_equal_addresses(sockaddr_storage *ss1, sockaddr_storage *ss2)
+{
+
+    if (ss1->ss_family != ss2->ss_family)
+    {
+        throw std::runtime_error("Sender addr does not match expected addr!");
+    }
+    else if (ss1->ss_family == AF_INET)
+    {
+        if (((sockaddr_in *)ss1)->sin_addr.s_addr != ((sockaddr_in *)ss2)->sin_addr.s_addr)
+        {
+            throw std::runtime_error("Sender addr does not match expected addr!");
+        }
+    }
+    else if (ss1->ss_family == AF_INET6)
+    {
+        if ( memcmp(&((sockaddr_in6 *)ss1)->sin6_addr, &((sockaddr_in6 *)ss2)->sin6_addr, sizeof(in6_addr)) )
+        {
+            throw std::runtime_error("Sender addr does not match expected addr!");
+        }
+    }
+    else
+    {
+        throw std::runtime_error("Address neither IPv4 or v6!");
+    }
+}
 
 void do_bind(int sock, sockaddr_storage *ss)
 {
@@ -128,16 +158,13 @@ int setup_socket(int domain, int type, int so_timestamping_flags)
 }
 
 
-void sendpacket(int domain, string address, in_port_t port, int sock)
+void sendpacket(int domain, string address, in_port_t port, int sock, char *buf, size_t buflen)
 {
-    const size_t BUFLEN = 1472;
-    char buf[BUFLEN];
-
     sockaddr_storage ss;
     create_sockaddr_storage(domain, address, port, &ss);
 
     cout << "Sending, ip addr " << address << " domain " << (domain == AF_INET ? "AF_INET" : "AF_INET6") << '\n';
-    sendpacket(&ss, sock, buf, BUFLEN);
+    sendpacket(&ss, sock, buf, buflen);
 }
 
 void sendpacket(sockaddr_storage *ss, int sock, char *buf, size_t buflen)
@@ -155,36 +182,43 @@ void sendpacket(sockaddr_storage *ss, int sock, char *buf, size_t buflen)
     cout << "Sending to " << addrstr << '\n';
 #endif
 
-    result = sendto(sock, buf, buflen, 0, (sockaddr *)ss, sizeof(*ss));
-    if (result == -1)
+    for (;;)
     {
-        throw std::system_error(errno, std::system_category());
+        result = sendto(sock, buf, buflen, 0, (sockaddr *)ss, sizeof(*ss));
+        if (result == -1)
+        {
+            if (errno == EAGAIN || errno == EWOULDBLOCK)
+            {
+                cout << "Got EAGAIN/EWOULDBLOCK, doing sleep/retry\n";
+                sleep(1);
+                continue;
+            }
+            throw std::system_error(errno, std::system_category());
+        }
+        cout << "Sent " << result << " bytes\n";
+        break;
     }
 }
 
-void recvpacket(int sock, int recvmsg_flags, char **databuf = nullptr, int *data_len = nullptr,
-                sockaddr_storage **ss = nullptr)
+tuple<shared_ptr<char>, int, sockaddr_storage> recvpacket(int sock, int recvmsg_flags)
 {
-    const size_t MAX_LEN = 1472;
-    char data[MAX_LEN];
+    const size_t MAX_LEN = 9000;
+    shared_ptr<char> data(new char[MAX_LEN]);
+    sockaddr_storage from_addr;
     msghdr msg;
     iovec entry;
-    sockaddr_storage from_addr;
     struct {
         struct cmsghdr cm;
         char control[512];
     } control;
     int len;
 
-    *databuf = 0;
-    *data_len = 0;
-    *ss = 0;
 
     memset(&msg, 0, sizeof(msg));
     msg.msg_iov = &entry;
     msg.msg_iovlen = 1;
-    entry.iov_base = data;
-    entry.iov_len = sizeof(data);
+    entry.iov_base = data.get();
+    entry.iov_len = MAX_LEN;
     msg.msg_name = (caddr_t)&from_addr;
     msg.msg_namelen = sizeof(from_addr);
     msg.msg_control = &control;
@@ -201,18 +235,8 @@ void recvpacket(int sock, int recvmsg_flags, char **databuf = nullptr, int *data
     }
     else
     {
-        printpacket(&msg, len, data,
-                sock, recvmsg_flags,
-                0, 0);
-        if (databuf)
-        {
-            *databuf = data;
-            *data_len = len;
-        }
-        if (ss)
-        {
-            *ss = &from_addr;
-        }
+        printpacket(&msg, len, sock, recvmsg_flags, 0, 0);
+        return tuple<shared_ptr<char>, int, sockaddr_storage>(data, len, from_addr);
     }
 }
 

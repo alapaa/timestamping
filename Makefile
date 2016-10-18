@@ -3,7 +3,7 @@ RECEIVER = receiver
 LIBS =
 
 CXX = g++
-CXXFLAGS = -std=c++11 -DDEBUG
+CXXFLAGS = -g -std=c++11 -DDEBUG
 
 .PHONY: default all clean
 
@@ -83,7 +83,7 @@ $(RECEIVER): $(R_OBJ)
 
 clean:
 	-rm -f $(SRC_DIR)/*.o $(SRC_DIR)/*.d $(TEST_SRC)/*.o $(TEST_SRC)/*.d
-	-rm -f $(TARGET) $(TESTS) gtest.a gtest_main.a
+	-rm -f $(SENDER) $(RECEIVER) $(TESTS) gtest.a gtest_main.a
 
 # Builds gtest.a and gtest_main.a.
 
@@ -113,5 +113,6 @@ gtest_main.a: gtest-all.o gtest_main.o
 # gtest_main.a, depending on whether it defines its own main()
 # function.
 
+# Uses libbsd from libbsd-dev pkg to get strlcpy.
 test_util: src/util.o src/gpl_code_remove.o $(TEST_OBJECTS) gtest_main.a
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $^ -lbsd -o $@

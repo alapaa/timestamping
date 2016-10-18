@@ -15,47 +15,23 @@
 using std::stoi;
 using std::cout;
 using std::string;
-
-void check_equal_addresses(sockaddr_storage *ss1, sockaddr_storage *ss2)
-{
-
-    if (ss1->ss_family != ss2->ss_family)
-    {
-        throw std::runtime_error("Sender addr does not match expected addr!");
-    }
-    else if (ss1->ss_family == AF_INET)
-    {
-        if (((sockaddr_in *)ss1)->sin_addr.s_addr != ((sockaddr_in *)ss2)->sin_addr.s_addr)
-        {
-            throw std::runtime_error("Sender addr does not match expected addr!");
-        }
-    }
-    else if (ss1->ss_family == AF_INET6)
-    {
-        if ( memcmp(&((sockaddr_in6 *)ss1)->sin6_addr, &((sockaddr_in6 *)ss2)->sin6_addr, sizeof(in6_addr)) )
-        {
-            throw std::runtime_error("Sender addr does not match expected addr!");
-        }
-    }
-    else
-    {
-        throw std::runtime_error("Address neither IPv4 or v6!");
-    }
-}
+using std::tuple;
+using std::shared_ptr;
 
 void receive_loop(string address, in_port_t listen_port, int domain, string iface_name)
 {
     int sock;
     const time_t SLEEP_TIME = 5;
-    char *databuf = 0;
+    shared_ptr<char> data;
     int datalen = 0;
-    sockaddr_storage *ss;
+    sockaddr_storage ss;
     sockaddr_storage expected_sender_addr;
-    create_sockaddr_storage(domain, address, listen_port, &expected_sender_addr);
+
     sock = setup_socket(domain, SOCK_DGRAM, SOF_TIMESTAMPING_TX_HARDWARE | SOF_TIMESTAMPING_RAW_HARDWARE);
     set_nonblocking(sock);
     setup_device(sock, iface_name, SOF_TIMESTAMPING_TX_HARDWARE);
 
+    create_sockaddr_storage(domain, address, listen_port, &expected_sender_addr);
     do_bind(sock, &expected_sender_addr);
 
     for (;;)
@@ -77,13 +53,13 @@ void receive_loop(string address, in_port_t listen_port, int domain, string ifac
         retval = pselect(sock+1, &rfds, NULL, &efds, &ts, NULL);
         if (retval == 0)
         {
-            cout << "Sleept " << SLEEP_TIME << "seconds without traffic...\n";
+            cout << "Slept " << SLEEP_TIME << " seconds without traffic...\n";
             continue;
         }
 
         if (FD_ISSET(sock, &rfds))
         {
-            recvpacket(sock, 0, &databuf, &datalen, &ss);
+            tie(data, datalen, ss) = recvpacket(sock, 0);
             if (datalen == 0)
             {
                 cout << "sock marked as readable by select, but no data read!\n";
@@ -92,11 +68,11 @@ void receive_loop(string address, in_port_t listen_port, int domain, string ifac
 
             // TODO: Prepare reflected pkt
 #ifdef DEBUG
-            // Compare address from recvpacket with cmd-line supplied expected sender addr.
-            check_equal_addresses(ss, &expected_sender_addr);
+            // Compare address from recvpacket with expected sender addr.
+            //check_equal_addresses(&ss, &expected_sender_addr);
 #endif
             // bounce the packet back
-            sendpacket(ss, sock, databuf, datalen);
+            sendpacket(&ss, sock, data.get(), datalen);
         }
     }
 }
@@ -111,7 +87,7 @@ int main(int argc, char *argv[])
 
     try
     {
-        if (argc != 6)
+        if (argc != 5)
         {
             throw std::runtime_error("Usage: receiver <sender ip addr> <listen port> <ip ver (4 or 6)> <iface>");
         }

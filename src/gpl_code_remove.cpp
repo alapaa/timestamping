@@ -17,7 +17,6 @@ using std::cout;
 
 // TODO: Remove/remake printpacket, it is GPL and uses C-style printf.
 void printpacket(struct msghdr *msg, int res,
-                 char *data,
                  int sock, int recvmsg_flags,
                  int siocgstamp, int siocgstampns)
 {
