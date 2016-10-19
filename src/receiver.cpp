@@ -25,14 +25,14 @@ void receive_loop(string address, in_port_t listen_port, int domain, string ifac
     shared_ptr<char> data;
     int datalen = 0;
     sockaddr_storage ss;
-    sockaddr_storage expected_sender_addr;
+    sockaddr_storage bind_addr;
 
     sock = setup_socket(domain, SOCK_DGRAM, SOF_TIMESTAMPING_TX_HARDWARE | SOF_TIMESTAMPING_RAW_HARDWARE);
     set_nonblocking(sock);
     setup_device(sock, iface_name, SOF_TIMESTAMPING_TX_HARDWARE);
 
-    create_sockaddr_storage(domain, address, listen_port, &expected_sender_addr);
-    do_bind(sock, &expected_sender_addr);
+    create_sockaddr_storage(domain, address, listen_port, &bind_addr);
+    do_bind(sock, &bind_addr);
 
     for (;;)
     {
@@ -51,6 +51,10 @@ void receive_loop(string address, in_port_t listen_port, int domain, string ifac
         ts.tv_nsec = 0;
 
         retval = pselect(sock+1, &rfds, NULL, &efds, &ts, NULL);
+        if (retval == -1)
+        {
+            throw std::system_error(errno, std::system_category());
+        }
         if (retval == 0)
         {
             cout << "Slept " << SLEEP_TIME << " seconds without traffic...\n";
@@ -69,10 +73,13 @@ void receive_loop(string address, in_port_t listen_port, int domain, string ifac
             // TODO: Prepare reflected pkt
 #ifdef DEBUG
             // Compare address from recvpacket with expected sender addr.
-            //check_equal_addresses(&ss, &expected_sender_addr);
+            //check_equal_addresses(&ss, &bind_addr);
 #endif
             // bounce the packet back
             sendpacket(&ss, sock, data.get(), datalen);
+            cout << "Sent reply, now get HW send timestamp...\n";
+            wait_for_errqueue_data(sock);
+            receive_send_timestamp(sock);
         }
     }
 }
@@ -89,7 +96,7 @@ int main(int argc, char *argv[])
     {
         if (argc != 5)
         {
-            throw std::runtime_error("Usage: receiver <sender ip addr> <listen port> <ip ver (4 or 6)> <iface>");
+            throw std::runtime_error("Usage: receiver <bind ip (can be 0.0.0.0)> <bind port> <ip ver (4 or 6)> <iface>");
         }
         else
         {

@@ -214,6 +214,8 @@ tuple<shared_ptr<char>, int, sockaddr_storage> recvpacket(int sock, int recvmsg_
     int len;
 
 
+    memset(&from_addr, 0, sizeof(from_addr));
+
     memset(&msg, 0, sizeof(msg));
     msg.msg_iov = &entry;
     msg.msg_iovlen = 1;
@@ -224,19 +226,38 @@ tuple<shared_ptr<char>, int, sockaddr_storage> recvpacket(int sock, int recvmsg_
     msg.msg_control = &control;
     msg.msg_controllen = sizeof(control);
 
-    len = recvmsg(sock, &msg, recvmsg_flags);
-    if (len == -1)
+    int retry_count = 0;
+    for (;;)
     {
-        throw std::system_error(errno, std::system_category());
-    }
-    else if (msg.msg_flags & MSG_TRUNC)
-    {
-        throw std::runtime_error("recvmsg, buffer too small, truncated!");
-    }
-    else
-    {
-        printpacket(&msg, len, sock, recvmsg_flags, 0, 0);
-        return tuple<shared_ptr<char>, int, sockaddr_storage>(data, len, from_addr);
+        cout << "Doing recvmsg, flags " << recvmsg_flags << '\n';
+        len = recvmsg(sock, &msg, recvmsg_flags);
+        if (len == -1)
+        {
+            if (errno == EAGAIN || errno == EWOULDBLOCK)
+            {
+                cout << "Got EAGAIN/EWOULDBLOCK, doing sleep/retry\n";
+                sleep(1);
+                if (retry_count++ < 3)
+                {
+                    continue;
+                }
+                else
+                {
+                    cout << "Could not receive on sock, giving up for now...\n";
+                    return tuple<shared_ptr<char>, int, sockaddr_storage>(shared_ptr<char>(nullptr), 0, from_addr);
+                }
+            }
+            throw std::system_error(errno, std::system_category());
+        }
+        else if (msg.msg_flags & MSG_TRUNC)
+        {
+            throw std::runtime_error("recvmsg, buffer too small, truncated!");
+        }
+        else
+        {
+            printpacket(&msg, len, sock, recvmsg_flags, 0, 0);
+            return tuple<shared_ptr<char>, int, sockaddr_storage>(data, len, from_addr);
+        }
     }
 }
 
