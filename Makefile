@@ -82,7 +82,7 @@ $(RECEIVER): $(R_OBJ)
 	$(CXX) $(R_OBJ) -Wall $(LIBS) -o $@
 
 clean:
-	-rm -f $(SRC_DIR)/*.o $(SRC_DIR)/*.d $(TEST_SRC)/*.o $(TEST_SRC)/*.d
+	-rm -f $(SRC_DIR)/*.o $(SRC_DIR)/*.d $(SRC_DIR)/*~ $(TEST_SRC)/*.o $(TEST_SRC)/*.d $(TEST_SRC)/*~
 	-rm -f $(SENDER) $(RECEIVER) $(TESTS) gtest.a gtest_main.a
 
 # Builds gtest.a and gtest_main.a.

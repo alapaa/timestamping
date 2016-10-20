@@ -8,6 +8,7 @@
 #include <linux/net_tstamp.h>
 
 #include "util.h"
+#include "packet.h"
 #include "sender.h"
 
 using std::stoi;
@@ -43,12 +44,15 @@ int main(int argc, char *argv[])
             iface_name = string(argv[5]);
         }
 
-        sock = setup_socket(domain, SOCK_DGRAM, SOF_TIMESTAMPING_TX_HARDWARE | SOF_TIMESTAMPING_RAW_HARDWARE);
-        setup_device(sock, iface_name, SOF_TIMESTAMPING_TX_HARDWARE);
+        sock = setup_socket(domain, SOCK_DGRAM, SOF_TIMESTAMPING_TX_HARDWARE | SOF_TIMESTAMPING_RX_HARDWARE | SOF_TIMESTAMPING_RAW_HARDWARE);
+        setup_device(sock, iface_name, SOF_TIMESTAMPING_TX_HARDWARE | SOF_TIMESTAMPING_RX_HARDWARE);
 
+        uint32_t send_counter = 0;
         for (; nr_packets; nr_packets--)
         {
+            prepare_packet(buf, BUFLEN, send_counter);
             sendpacket(domain, address, port, sock, buf, BUFLEN);
+            send_counter++;
             wait_for_errqueue_data(sock);
             receive_send_timestamp(sock);
             cout << "Sleeping...\n";
