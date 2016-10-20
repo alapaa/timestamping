@@ -203,7 +203,7 @@ void sendpacket(sockaddr_storage *ss, int sock, char *buf, size_t buflen)
 tuple<shared_ptr<char>, int, sockaddr_storage> recvpacket(int sock, int recvmsg_flags)
 {
     const size_t MAX_LEN = 9000;
-    shared_ptr<char> data(new char[MAX_LEN]);
+    shared_ptr<char> data(new char[MAX_LEN]); // TODO: Change to vector<char> or maybe shared_array
     sockaddr_storage from_addr;
     msghdr msg;
     iovec entry;

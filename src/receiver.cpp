@@ -4,11 +4,13 @@
 #include <system_error>
 
 #include <cstring>
+#include <cassert>
 
 #include <unistd.h>
 #include <netinet/in.h>
 #include <linux/net_tstamp.h>
 
+#include "packet.h"
 #include "util.h"
 #include "sender.h"
 
@@ -17,6 +19,8 @@ using std::cout;
 using std::string;
 using std::tuple;
 using std::shared_ptr;
+
+using namespace Netrounds;
 
 void receive_loop(string address, in_port_t listen_port, int domain, string iface_name)
 {
@@ -34,6 +38,7 @@ void receive_loop(string address, in_port_t listen_port, int domain, string ifac
     create_sockaddr_storage(domain, address, listen_port, &bind_addr);
     do_bind(sock, &bind_addr);
 
+    uint32_t refl_counter = 0;
     for (;;)
     {
         fd_set efds;
@@ -66,9 +71,10 @@ void receive_loop(string address, in_port_t listen_port, int domain, string ifac
             tie(data, datalen, ss) = recvpacket(sock, 0);
             if (datalen == 0)
             {
-                cout << "sock marked as readable by select, but no data read!\n";
+                cout << "sock marked as readable by select(), but no data read!\n";
                 continue;
             }
+            shared_ptr<SenderPacket> pkt = decode_packet(data.get(), datalen);
 
             // TODO: Prepare reflected pkt
 #ifdef DEBUG
@@ -76,13 +82,22 @@ void receive_loop(string address, in_port_t listen_port, int domain, string ifac
             //check_equal_addresses(&ss, &bind_addr);
 #endif
             // bounce the packet back
+
+            shared_ptr<ReflectorPacket> retpkt(new ReflectorPacket);
+            memset(retpkt.get(), 0, sizeof(*retpkt));
+            retpkt->type = FROM_REFLECTOR;
+            retpkt->sender_seq = pkt->sender_seq;
+            retpkt->refl_seq = refl_counter;
+            tie(data, datalen) = serialize_reflector_packet(retpkt);
             sendpacket(&ss, sock, data.get(), datalen);
+            refl_counter++;
             cout << "Sent reply, now get HW send timestamp...\n";
             wait_for_errqueue_data(sock);
             receive_send_timestamp(sock);
         }
     }
 }
+
 
 int main(int argc, char *argv[])
 {

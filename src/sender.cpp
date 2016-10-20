@@ -15,6 +15,8 @@ using std::stoi;
 using std::cout;
 using std::string;
 
+using Netrounds::prepare_packet;
+
 int main(int argc, char *argv[])
 {
     int nr_packets = 0;
