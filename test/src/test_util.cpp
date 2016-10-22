@@ -44,6 +44,7 @@ TEST_F(UtilTest, RecvPacket)
     shared_ptr<char> data;
     int datalen = 0;
     sockaddr_storage ss;
+    timespec hwts;
 
     sock = socket(AF_UNIX, SOCK_DGRAM, 0);
     if (sock == -1)
@@ -82,7 +83,7 @@ TEST_F(UtilTest, RecvPacket)
         throw std::system_error(errno, std::system_category());
     }
 
-    tie(data, datalen, ss) = recvpacket(sock2, 0);
+    tie(data, datalen, ss, hwts) = recvpacket(sock2, 0);
     //check_equal_addresses(&ss, &send_ss);
     string received_buf(data.get());
     EXPECT_EQ(received_buf, string(buf));
@@ -101,6 +102,7 @@ TEST_F(UtilTest, RecvPacketRealUdp)
     string addr("127.0.0.1");
     sockaddr_storage expected_sender_addr;
     sockaddr_storage ss;
+    timespec hwts;
 
     sock = socket(domain, SOCK_DGRAM, 0);
     if (sock == -1)
@@ -118,7 +120,7 @@ TEST_F(UtilTest, RecvPacketRealUdp)
     do_bind(sock2, &expected_sender_addr);
 
     sendpacket(domain, addr, listen_port, sock, buf, sizeof(buf));
-    tie(data, datalen, ss) = recvpacket(sock2, 0);
+    tie(data, datalen, ss, hwts) = recvpacket(sock2, 0);
 
     check_equal_addresses(&ss, &expected_sender_addr);
     string received_buf(data.get());

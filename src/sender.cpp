@@ -36,6 +36,8 @@ int main(int argc, char *argv[])
     size_t datalen;
     sockaddr_storage ss;
 
+    timespec t4;
+
     try
     {
         if (argc != 6)
@@ -63,7 +65,7 @@ int main(int argc, char *argv[])
             send_counter++;
             wait_for_errqueue_data(sock);
             receive_send_timestamp(sock);
-            tie(data, datalen, ss) = recvpacket(sock, 0);
+            tie(data, datalen, ss, t4) = recvpacket(sock, 0);
             cout << "Sleeping...\n";
             sleep(5);
         }

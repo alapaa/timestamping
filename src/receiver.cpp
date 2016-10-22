@@ -31,6 +31,7 @@ void receive_loop(string address, in_port_t listen_port, int domain, string ifac
     int datalen = 0;
     sockaddr_storage ss;
     sockaddr_storage bind_addr;
+    uint32_t prev_sender_seq = 0;
 
     sock = setup_socket(domain, SOCK_DGRAM, SOF_TIMESTAMPING_TX_HARDWARE | SOF_TIMESTAMPING_RX_HARDWARE | SOF_TIMESTAMPING_RAW_HARDWARE);
     set_nonblocking(sock);
@@ -46,6 +47,16 @@ void receive_loop(string address, in_port_t listen_port, int domain, string ifac
         fd_set rfds;
         timespec ts;
         int retval;
+
+        timespec t2;
+        timespec t2_prev;
+        timespec t3;
+        timespec t3_prev;
+
+        memset(&t2, 0, sizeof(t2));
+        memset(&t2_prev, 0, sizeof(t2_prev));
+        memset(&t3, 0, sizeof(t3));
+        memset(&t3_prev, 0, sizeof(t3_prev));
 
         FD_ZERO(&efds);
         FD_ZERO(&rfds);
@@ -69,7 +80,8 @@ void receive_loop(string address, in_port_t listen_port, int domain, string ifac
 
         if (FD_ISSET(sock, &rfds))
         {
-            tie(data, datalen, ss) = recvpacket(sock, 0);
+            t2_prev = t2;
+            tie(data, datalen, ss, t2) = recvpacket(sock, 0);
             if (datalen == 0)
             {
                 cout << "sock marked as readable by select(), but no data read!\n";
@@ -83,6 +95,16 @@ void receive_loop(string address, in_port_t listen_port, int domain, string ifac
             retpkt->type = FROM_REFLECTOR;
             retpkt->sender_seq = pkt->sender_seq;
             retpkt->refl_seq = refl_counter;
+            if (prev_sender_seq == (pkt->sender_seq - 1))
+            {
+                //retpkt->t2 = t2_prev;
+                //retpkt->t3 = t3;
+            }
+            else
+            {
+                cout << "Missed prev pkt, cannot piggyback hw timestaps\n";
+            }
+            prev_sender_seq = pkt->sender_seq;
             tie(data, datalen) = serialize_reflector_packet(retpkt);
             //char tmp[] = "abcdefghijklmnopqrsquvxyz";
             //strlcpy(data.get(), tmp, sizeof(tmp));
@@ -90,7 +112,8 @@ void receive_loop(string address, in_port_t listen_port, int domain, string ifac
             refl_counter++;
             cout << "Sent reply, now get HW send timestamp...\n";
             wait_for_errqueue_data(sock);
-            receive_send_timestamp(sock);
+            t3_prev = t3;
+            tie(data, datalen, ss, t3) = receive_send_timestamp(sock);
         }
     }
 }

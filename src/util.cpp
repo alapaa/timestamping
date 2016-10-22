@@ -200,7 +200,7 @@ void sendpacket(sockaddr_storage *ss, int sock, char *buf, size_t buflen)
     }
 }
 
-tuple<shared_ptr<char>, int, sockaddr_storage> recvpacket(int sock, int recvmsg_flags)
+tuple<shared_ptr<char>, int, sockaddr_storage, timespec> recvpacket(int sock, int recvmsg_flags)
 {
     const size_t MAX_LEN = 9000;
     shared_ptr<char> data(new char[MAX_LEN]); // TODO: Change to vector<char> or maybe shared_array
@@ -244,7 +244,10 @@ tuple<shared_ptr<char>, int, sockaddr_storage> recvpacket(int sock, int recvmsg_
                 else
                 {
                     cout << "Could not receive on sock, giving up for now...\n";
-                    return tuple<shared_ptr<char>, int, sockaddr_storage>(shared_ptr<char>(nullptr), 0, from_addr);
+                    timespec null_ts;
+                    null_ts.tv_sec = 0;
+                    null_ts.tv_nsec = 0;
+                    return tuple<shared_ptr<char>, int, sockaddr_storage, timespec>(shared_ptr<char>(nullptr), 0, from_addr, null_ts);
                 }
             }
             throw std::system_error(errno, std::system_category());
@@ -255,31 +258,34 @@ tuple<shared_ptr<char>, int, sockaddr_storage> recvpacket(int sock, int recvmsg_
         }
         else
         {
-            printpacket(&msg, len, sock, recvmsg_flags, 0, 0);
-            return tuple<shared_ptr<char>, int, sockaddr_storage>(data, len, from_addr);
+            timespec hwts;
+            printpacket(&msg, len, sock, recvmsg_flags, 0, 0, &hwts);
+            return tuple<shared_ptr<char>, int, sockaddr_storage, timespec>(data, len, from_addr, hwts);
         }
     }
 }
 
-void receive_send_timestamp(int sock)
+tuple<shared_ptr<char>, int, sockaddr_storage, timespec> receive_send_timestamp(int sock)
 {
-    shared_ptr<char> data;
-    size_t datalen;
-    sockaddr_storage ss;
+    //shared_ptr<char> data;
+    //size_t datalen;
+    //sockaddr_storage ss;
+    //timespec htws;
 
-    tie(data, datalen, ss) = recvpacket(sock, MSG_ERRQUEUE);
+    //tie(data, datalen, ss, hwts) = recvpacket(sock, MSG_ERRQUEUE);
 
     //cout << "as char: " << data.get()+42 << '\n';
-    char tmp[1500];
-    const int offset = 42;
-    memcpy(tmp, data.get()+offset, 1500);
-    uint32_t *wp = (uint32_t *)tmp;
+    // char tmp[1500];
+    // const int offset = 42;
+    // memcpy(tmp, data.get()+offset, 1500); // TODO: 42 is not divisible by word-length 4 bytes. Can we avoid copy?
+    // uint32_t *wp = (uint32_t *)tmp;
 
-    for (int i = 0; i < 3; i++)
-    {
-        cout << "word " << i << " of packet payload from MSG_ERRQUEUE: " << htonl(*(wp+i)) << '\n';
-    }
+    // for (int i = 0; i < 3; i++)
+    // {
+    //     cout << "word " << i << " of packet payload from MSG_ERRQUEUE: " << htonl(*(wp+i)) << '\n';
+    // }
 
+    return recvpacket(sock, MSG_ERRQUEUE);
 }
 
 

@@ -18,13 +18,14 @@ using std::cout;
 // TODO: Remove/remake printpacket, it is GPL and uses C-style printf.
 void printpacket(struct msghdr *msg, int res,
                  int sock, int recvmsg_flags,
-                 int siocgstamp, int siocgstampns)
+                 int siocgstamp, int siocgstampns, timespec *ts_result)
 {
     struct sockaddr_in *from_addr = (struct sockaddr_in *)msg->msg_name;
     struct cmsghdr *cmsg;
     struct timeval tv;
     struct timespec ts;
     struct timeval now;
+    memset(ts_result, 0, sizeof(*ts_result));
 
     gettimeofday(&now, 0);
 
@@ -71,6 +72,7 @@ void printpacket(struct msghdr *msg, int res,
                 printf("HW raw %ld.%09ld",
                        (long)stamp->tv_sec,
                        (long)stamp->tv_nsec);
+                *ts_result = *stamp;
                 break;
             }
             default:
