@@ -2,6 +2,7 @@
 #include <string>
 #include <iostream>
 #include <system_error>
+#include <memory>
 
 #include <unistd.h>
 #include <netinet/in.h>
@@ -14,6 +15,7 @@
 using std::stoi;
 using std::cout;
 using std::string;
+using std::shared_ptr;
 
 using Netrounds::prepare_packet;
 
@@ -29,6 +31,10 @@ int main(int argc, char *argv[])
 
     const size_t BUFLEN = 1472;
     char buf[BUFLEN];
+
+    shared_ptr<char> data;
+    size_t datalen;
+    sockaddr_storage ss;
 
     try
     {
@@ -57,6 +63,7 @@ int main(int argc, char *argv[])
             send_counter++;
             wait_for_errqueue_data(sock);
             receive_send_timestamp(sock);
+            tie(data, datalen, ss) = recvpacket(sock, 0);
             cout << "Sleeping...\n";
             sleep(5);
         }
