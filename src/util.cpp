@@ -263,8 +263,13 @@ tuple<shared_ptr<char>, int, sockaddr_storage> recvpacket(int sock, int recvmsg_
 
 void receive_send_timestamp(int sock)
 {
-    recvpacket(sock, MSG_ERRQUEUE);
+    shared_ptr<char> data;
+    size_t datalen;
+    sockaddr_storage ss;
+
+    tie(data, datalen, ss) = recvpacket(sock, MSG_ERRQUEUE);
 }
+
 
 void create_sockaddr_storage(int domain, string address, in_port_t port, sockaddr_storage *ssp)
 {

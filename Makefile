@@ -1,10 +1,9 @@
 SENDER = sender
 RECEIVER = receiver
-LIBS =
 
 CXX = g++
 CXXFLAGS = -g -std=c++11 -DDEBUG
-
+LDFLAGS = -lbsd
 .PHONY: default all clean
 
 PROJ_ROOT = .
@@ -75,11 +74,11 @@ include $(TEST_SOURCES:.cpp=.d)
 
 S_OBJ = $(filter-out ./src/receiver.o, $(OBJECTS))
 $(SENDER): $(S_OBJ)
-	$(CXX) $(S_OBJ) -Wall $(LIBS) -o $@
+	$(CXX) $(S_OBJ) -Wall $(LDFLAGS) -o $@
 
 R_OBJ = $(filter-out ./src/sender.o, $(OBJECTS))
 $(RECEIVER): $(R_OBJ)
-	$(CXX) $(R_OBJ) -Wall $(LIBS) -o $@
+	$(CXX) $(R_OBJ) -Wall $(LDFLAGS) -o $@
 
 clean:
 	-rm -f $(SRC_DIR)/*.o $(SRC_DIR)/*.d $(SRC_DIR)/*~ $(TEST_SRC)/*.o $(TEST_SRC)/*.d $(TEST_SRC)/*~
@@ -115,4 +114,4 @@ gtest_main.a: gtest-all.o gtest_main.o
 
 # Uses libbsd from libbsd-dev pkg to get strlcpy.
 test_util: src/util.o src/gpl_code_remove.o $(TEST_OBJECTS) gtest_main.a
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $^ -lbsd -o $@
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $^ $(LDFLAGS) -o $@
