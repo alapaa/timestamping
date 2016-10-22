@@ -9,6 +9,7 @@
 #include <unistd.h>
 #include <netinet/in.h>
 #include <linux/net_tstamp.h>
+#include <bsd/string.h>
 
 #include "packet.h"
 #include "util.h"
@@ -31,14 +32,14 @@ void receive_loop(string address, in_port_t listen_port, int domain, string ifac
     sockaddr_storage ss;
     sockaddr_storage bind_addr;
 
-    sock = setup_socket(domain, SOCK_DGRAM, SOF_TIMESTAMPING_TX_HARDWARE | SOF_TIMESTAMPING_RAW_HARDWARE);
+    sock = setup_socket(domain, SOCK_DGRAM, SOF_TIMESTAMPING_TX_HARDWARE | SOF_TIMESTAMPING_RX_HARDWARE | SOF_TIMESTAMPING_RAW_HARDWARE);
     set_nonblocking(sock);
-    setup_device(sock, iface_name, SOF_TIMESTAMPING_TX_HARDWARE);
+    setup_device(sock, iface_name, SOF_TIMESTAMPING_TX_HARDWARE | SOF_TIMESTAMPING_RX_HARDWARE);
 
     create_sockaddr_storage(domain, address, listen_port, &bind_addr);
     do_bind(sock, &bind_addr);
 
-    uint32_t refl_counter = 0;
+    uint32_t refl_counter = 1234;
     for (;;)
     {
         fd_set efds;
@@ -76,19 +77,15 @@ void receive_loop(string address, in_port_t listen_port, int domain, string ifac
             }
             shared_ptr<SenderPacket> pkt = decode_packet(data.get(), datalen);
 
-            // TODO: Prepare reflected pkt
-#ifdef DEBUG
-            // Compare address from recvpacket with expected sender addr.
-            //check_equal_addresses(&ss, &bind_addr);
-#endif
             // bounce the packet back
-
             shared_ptr<ReflectorPacket> retpkt(new ReflectorPacket);
             memset(retpkt.get(), 0, sizeof(*retpkt));
             retpkt->type = FROM_REFLECTOR;
             retpkt->sender_seq = pkt->sender_seq;
             retpkt->refl_seq = refl_counter;
             tie(data, datalen) = serialize_reflector_packet(retpkt);
+            //char tmp[] = "abcdefghijklmnopqrsquvxyz";
+            //strlcpy(data.get(), tmp, sizeof(tmp));
             sendpacket(&ss, sock, data.get(), datalen);
             refl_counter++;
             cout << "Sent reply, now get HW send timestamp...\n";

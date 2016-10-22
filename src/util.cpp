@@ -268,6 +268,18 @@ void receive_send_timestamp(int sock)
     sockaddr_storage ss;
 
     tie(data, datalen, ss) = recvpacket(sock, MSG_ERRQUEUE);
+
+    //cout << "as char: " << data.get()+42 << '\n';
+    char tmp[1500];
+    const int offset = 42;
+    memcpy(tmp, data.get()+offset, 1500);
+    uint32_t *wp = (uint32_t *)tmp;
+
+    for (int i = 0; i < 3; i++)
+    {
+        cout << "word " << i << " of packet payload from MSG_ERRQUEUE: " << htonl(*(wp+i)) << '\n';
+    }
+
 }
 
 
