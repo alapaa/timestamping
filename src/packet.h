@@ -45,8 +45,9 @@ struct ReflectorPacket
 };
 
 void prepare_packet(char* buf, size_t buflen, uint32_t seq);
-std::shared_ptr<SenderPacket> decode_packet(char *data, size_t datalen);
+std::shared_ptr<SenderPacket> deserialize_packet(char *data, size_t datalen);
 std::tuple<std::shared_ptr<char>, size_t> serialize_reflector_packet(std::shared_ptr<ReflectorPacket>& pkt);
+std::shared_ptr<ReflectorPacket> deserialize_reflector_packet(std::shared_ptr<char> data, int datalen);
 bool check_seqnr(std::shared_ptr<char> data, int datalen, uint32_t seqnr);
 };
 

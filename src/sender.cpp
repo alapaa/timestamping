@@ -18,6 +18,8 @@ using std::string;
 using std::shared_ptr;
 
 using Netrounds::prepare_packet;
+using Netrounds::deserialize_reflector_packet;
+using Netrounds::ReflectorPacket;
 
 int main(int argc, char *argv[])
 {
@@ -36,6 +38,7 @@ int main(int argc, char *argv[])
     size_t datalen;
     sockaddr_storage ss;
 
+    timespec t1;
     timespec t4;
 
     try
@@ -64,8 +67,9 @@ int main(int argc, char *argv[])
             sendpacket(domain, address, port, sock, buf, BUFLEN);
             send_counter++;
             wait_for_errqueue_data(sock);
-            receive_send_timestamp(sock);
+            tie(data, datalen, ss, t1) = receive_send_timestamp(sock);
             tie(data, datalen, ss, t4) = recvpacket(sock, 0);
+            shared_ptr<ReflectorPacket> rp = deserialize_reflector_packet(data, datalen);
             cout << "Sleeping...\n";
             sleep(5);
         }

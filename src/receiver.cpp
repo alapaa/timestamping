@@ -85,7 +85,7 @@ void receive_loop(string address, in_port_t listen_port, int domain, string ifac
                 cout << "sock marked as readable by select(), but no data read!\n";
                 continue;
             }
-            shared_ptr<SenderPacket> pkt = decode_packet(data.get(), datalen);
+            shared_ptr<SenderPacket> pkt = deserialize_packet(data.get(), datalen);
 
             // bounce the packet back
             shared_ptr<ReflectorPacket> retpkt(new ReflectorPacket);
