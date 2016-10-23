@@ -50,12 +50,10 @@ void receive_loop(string address, in_port_t listen_port, int domain, string ifac
 
         timespec t2;
         timespec t2_prev;
-        timespec t3;
         timespec t3_prev;
 
         memset(&t2, 0, sizeof(t2));
         memset(&t2_prev, 0, sizeof(t2_prev));
-        memset(&t3, 0, sizeof(t3));
         memset(&t3_prev, 0, sizeof(t3_prev));
 
         FD_ZERO(&efds);
@@ -94,11 +92,14 @@ void receive_loop(string address, in_port_t listen_port, int domain, string ifac
             memset(retpkt.get(), 0, sizeof(*retpkt));
             retpkt->type = FROM_REFLECTOR;
             retpkt->sender_seq = pkt->sender_seq;
-            retpkt->refl_seq = refl_counter;
+            retpkt->refl_seq = refl_counter++;
             if (prev_sender_seq == (pkt->sender_seq - 1))
             {
-                //retpkt->t2 = t2_prev;
-                //retpkt->t3 = t3;
+                cout << "OK, piggybacking prev pkt T2 and T3, prev pkt seqnr " << prev_sender_seq << '\n';
+                retpkt->t2_sec = t2_prev.tv_sec;
+                retpkt->t2_nsec = t2_prev.tv_nsec;
+                retpkt->t3_sec = t3_prev.tv_sec;
+                retpkt->t3_nsec = t3_prev.tv_nsec;
             }
             else
             {
@@ -109,11 +110,10 @@ void receive_loop(string address, in_port_t listen_port, int domain, string ifac
             //char tmp[] = "abcdefghijklmnopqrsquvxyz";
             //strlcpy(data.get(), tmp, sizeof(tmp));
             sendpacket(&ss, sock, data.get(), datalen);
-            refl_counter++;
             cout << "Sent reply, now get HW send timestamp...\n";
             wait_for_errqueue_data(sock);
-            t3_prev = t3;
-            tie(data, datalen, ss, t3) = receive_send_timestamp(sock);
+            tie(data, datalen, ss, t3_prev) = receive_send_timestamp(sock);
+            check_seqnr(data, datalen, pkt->sender_seq);
         }
     }
 }

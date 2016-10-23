@@ -288,7 +288,6 @@ tuple<shared_ptr<char>, int, sockaddr_storage, timespec> receive_send_timestamp(
     return recvpacket(sock, MSG_ERRQUEUE);
 }
 
-
 void create_sockaddr_storage(int domain, string address, in_port_t port, sockaddr_storage *ssp)
 {
     // Implementation note: Should use type-punning through union in this function to make sure the compiler does

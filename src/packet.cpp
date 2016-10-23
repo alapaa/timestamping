@@ -73,6 +73,9 @@ shared_ptr<SenderPacket> decode_packet(char *data, size_t datalen)
 
 tuple<shared_ptr<char>, size_t> serialize_reflector_packet(shared_ptr<ReflectorPacket>& pkt)
 {
+    static_assert(sizeof(timespec) == 4*sizeof(uint32_t), "ouch1");
+    static_assert(sizeof(timespec::tv_sec) == 2*sizeof(uint32_t), "ouch2");
+    static_assert(sizeof(timespec::tv_nsec) == 2*sizeof(uint32_t), "ouch3");
     size_t BUFLEN = 1472;
     pkt->type = serialize(pkt->type);
     pkt->sender_seq = htonl(pkt->sender_seq);
@@ -83,5 +86,27 @@ tuple<shared_ptr<char>, size_t> serialize_reflector_packet(shared_ptr<ReflectorP
     memcpy(data.get(), pkt.get(), sizeof(*pkt));
 
     return tuple<shared_ptr<char>, size_t>(data, BUFLEN);
+}
+
+bool check_seqnr(shared_ptr<char> data, int datalen, uint32_t seqnr)
+{
+    assert(datalen = 1514);
+    const int offset = 42;
+    uint32_t *p = (uint32_t *)(data.get() + offset);
+    if (ntohl(*p) != FROM_REFLECTOR)
+    {
+        cout << "Wrong packet type, expected " << FROM_REFLECTOR << " got " << ntohl(*p) << '\n';
+        return false;
+    }
+    p += sizeof(ReflectorPacket::type)/sizeof(uint32_t);
+    if (ntohl(*p) != seqnr)
+    {
+        cout << "Expected seqnr " << seqnr << ", got " << ntohl(*p) << "!\n";
+        return false;
+    }
+    else
+    {
+        return true;
+    }
 }
 };
