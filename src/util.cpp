@@ -182,6 +182,7 @@ void sendpacket(sockaddr_storage *ss, int sock, char *buf, size_t buflen)
     cout << "Sending to " << addrstr << '\n';
 #endif
 
+    // TODO: Handle EAGAIN better.
     for (;;)
     {
         result = sendto(sock, buf, buflen, 0, (sockaddr *)ss, sizeof(*ss));

@@ -96,6 +96,8 @@ void receive_loop(string address, in_port_t listen_port, int domain, string ifac
             if (prev_sender_seq == (pkt->sender_seq - 1))
             {
                 cout << "OK, piggybacking prev pkt T2 and T3, prev pkt seqnr " << prev_sender_seq << '\n';
+                print_ts(t2_prev);
+                print_ts(t3_prev);
                 retpkt->t2_sec = t2_prev.tv_sec;
                 retpkt->t2_nsec = t2_prev.tv_nsec;
                 retpkt->t3_sec = t3_prev.tv_sec;
@@ -107,8 +109,6 @@ void receive_loop(string address, in_port_t listen_port, int domain, string ifac
             }
             prev_sender_seq = pkt->sender_seq;
             tie(data, datalen) = serialize_reflector_packet(retpkt);
-            //char tmp[] = "abcdefghijklmnopqrsquvxyz";
-            //strlcpy(data.get(), tmp, sizeof(tmp));
             sendpacket(&ss, sock, data.get(), datalen);
             cout << "Sent reply, now get HW send timestamp...\n";
             wait_for_errqueue_data(sock);

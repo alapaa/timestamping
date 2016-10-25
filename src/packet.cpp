@@ -36,6 +36,49 @@ template<class T1> T1 serialize(T1 val)
 
 namespace Netrounds
 {
+
+bool operator!=(const timespec& t1, const timespec& t2)
+{
+    if (t1.tv_sec == t2.tv_sec && t1.tv_nsec == t2.tv_nsec)
+    {
+        return false;
+    }
+    else
+    {
+        return true;
+    }
+}
+
+void print_ts(const timespec& ts)
+{
+    printf("%ld.%09ld\n",
+           (long)ts.tv_sec,
+           (long)ts.tv_nsec);
+}
+
+timespec subtract_ts(const timespec& newer, const timespec& older)
+{
+    timespec result;
+
+    if ((newer.tv_nsec - older.tv_nsec) < 0)
+    {
+        result.tv_sec = newer.tv_sec - older.tv_sec - 1;
+        result.tv_nsec = newer.tv_nsec - older.tv_nsec + 1000000000;
+    }
+    else
+    {
+        result.tv_sec = newer.tv_sec - older.tv_sec;
+        result.tv_nsec = newer.tv_nsec - older.tv_nsec;
+    }
+
+    return result;
+}
+
+timespec make_timespec(timestamp_t tv_sec, timestamp_t tv_nsec)
+{
+    return timespec{tv_sec, tv_nsec};
+}
+
 void prepare_packet(char* buf, size_t buflen, uint32_t seq)
 {
     SenderPacket pkt;

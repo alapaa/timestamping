@@ -17,9 +17,11 @@ using std::cout;
 using std::string;
 using std::shared_ptr;
 
-using Netrounds::prepare_packet;
-using Netrounds::deserialize_reflector_packet;
-using Netrounds::ReflectorPacket;
+//using Netrounds::make_timespec;
+//using Netrounds::prepare_packet;
+//using Netrounds::deserialize_reflector_packet;
+//using Netrounds::ReflectorPacket;
+using namespace Netrounds;
 
 int main(int argc, char *argv[])
 {
@@ -38,8 +40,18 @@ int main(int argc, char *argv[])
     size_t datalen;
     sockaddr_storage ss;
 
-    timespec t1;
-    timespec t4;
+    const timespec ZERO_TS = {0, 0};
+    timespec t1 = ZERO_TS;
+    timespec t4 = ZERO_TS;
+    timespec t1_prev;
+    timespec t2_prev;
+    timespec t3_prev;
+    timespec t4_prev;
+
+    timespec rtt_soft;
+    timespec rtt_hard;
+    timespec delay_on_refl;
+
 
     try
     {
@@ -63,13 +75,51 @@ int main(int argc, char *argv[])
         uint32_t send_counter = 0;
         for (; nr_packets; nr_packets--)
         {
-            prepare_packet(buf, BUFLEN, send_counter);
+            prepare_packet(buf, BUFLEN, send_counter++);
             sendpacket(domain, address, port, sock, buf, BUFLEN);
-            send_counter++;
             wait_for_errqueue_data(sock);
+            t1_prev = t1;
+            t4_prev = t4;
             tie(data, datalen, ss, t1) = receive_send_timestamp(sock);
             tie(data, datalen, ss, t4) = recvpacket(sock, 0);
+            if (!data)
+            {
+                cout << "----------No data from sender at lap " << (send_counter - 1) << '\n';
+                continue;
+            }
             shared_ptr<ReflectorPacket> rp = deserialize_reflector_packet(data, datalen);
+            if (rp->sender_seq != (send_counter-1))
+            {
+                cout << "---------- REFLECTED SEQNR " << rp->sender_seq << "DOES NOT MATCH SEND SEQNR " <<
+                    (send_counter-1) << '\n';
+            }
+            t2_prev = make_timespec(rp->t2_sec, rp->t2_nsec);
+            t3_prev = make_timespec(rp->t3_sec, rp->t3_nsec);
+
+            print_ts(t1_prev);
+            print_ts(t2_prev);
+            print_ts(t3_prev);
+            print_ts(t4_prev);
+
+            if (t1_prev != ZERO_TS && t4_prev != ZERO_TS &&
+                t2_prev != ZERO_TS && t3_prev != ZERO_TS)
+            {
+                rtt_soft = subtract_ts(t4_prev, t1_prev);
+                delay_on_refl = subtract_ts(t3_prev, t2_prev);
+                rtt_hard = subtract_ts(rtt_soft, delay_on_refl);
+
+                printf("rtt_soft %ld.%09ld\n",
+                       (long)rtt_soft.tv_sec,
+                       (long)rtt_soft.tv_nsec);
+                printf("rtt_soft %ld.%09ld",
+                       (long)rtt_hard.tv_sec,
+                       (long)rtt_hard.tv_nsec);
+            }
+            else
+            {
+                cout << "---- missing values in 4-tuple T1 - T4, cannot compute\n";
+            }
+
             cout << "Sleeping...\n";
             sleep(5);
         }

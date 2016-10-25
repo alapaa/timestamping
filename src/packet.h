@@ -44,6 +44,10 @@ struct ReflectorPacket
     timestamp_t t3_nsec;
 };
 
+bool operator!=(const timespec& t1, const timespec& t2);
+void print_ts(const timespec& ts);
+timespec subtract_ts(const timespec& newer, const timespec& older);
+timespec make_timespec(timestamp_t tv_sec, timestamp_t tv_nsec);
 void prepare_packet(char* buf, size_t buflen, uint32_t seq);
 std::shared_ptr<SenderPacket> deserialize_packet(char *data, size_t datalen);
 std::tuple<std::shared_ptr<char>, size_t> serialize_reflector_packet(std::shared_ptr<ReflectorPacket>& pkt);
