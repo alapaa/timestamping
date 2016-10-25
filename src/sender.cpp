@@ -122,7 +122,12 @@ int main(int argc, char *argv[])
             }
 
             cout << "Sleeping...\n";
-            result = usleep(1000);
+            timespec currtime;
+            clock_gettime(CLOCK_MONOTONIC, &currtime);
+            const long long int INTERVAL_NANOSEC = 1000000;
+            int remain_sleeplen_ns = -1* (currtime.tv_nsec % INTERVAL_NANOSEC) + INTERVAL_NANOSEC;
+            cout << "sleeplen " << remain_sleeplen_ns << '\n';
+            result = usleep(remain_sleeplen_ns/1000);
             if (result == -1)
             {
                 throw std::system_error(errno, std::system_category());
