@@ -52,6 +52,7 @@ int main(int argc, char *argv[])
     timespec rtt_hard;
     timespec delay_on_refl;
 
+    int result;
 
     try
     {
@@ -111,7 +112,7 @@ int main(int argc, char *argv[])
                 printf("rtt_soft %ld.%09ld\n",
                        (long)rtt_soft.tv_sec,
                        (long)rtt_soft.tv_nsec);
-                printf("rtt_soft %ld.%09ld",
+                printf("rtt_hard %ld.%09ld\n",
                        (long)rtt_hard.tv_sec,
                        (long)rtt_hard.tv_nsec);
             }
@@ -121,7 +122,11 @@ int main(int argc, char *argv[])
             }
 
             cout << "Sleeping...\n";
-            sleep(5);
+            result = usleep(1000);
+            if (result == -1)
+            {
+                throw std::system_error(errno, std::system_category());
+            }
         }
     }
     catch (std::exception &exc)
