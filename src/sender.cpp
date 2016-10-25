@@ -52,6 +52,7 @@ int main(int argc, char *argv[])
     timespec rtt_hard;
     timespec delay_on_refl;
 
+    timespec initial_clock_diff {0, 0};
     int result;
 
     try
@@ -105,16 +106,34 @@ int main(int argc, char *argv[])
             if (t1_prev != ZERO_TS && t4_prev != ZERO_TS &&
                 t2_prev != ZERO_TS && t3_prev != ZERO_TS)
             {
+                if (initial_clock_diff == ZERO_TS)
+                {
+                    initial_clock_diff = subtract_ts(t1_prev, t2_prev);
+                    cout << "Setting initial clock diff: ";
+                    print_ts(initial_clock_diff);
+                    cout << '\n';
+                }
+                else
+                {
+                    cout << "Showing initial clock diff: ";
+                    print_ts(initial_clock_diff);
+                    cout << '\n';
+
+                    cout << "Clock diff sender<->reflector: ";
+                    timespec clockdiff = subtract_ts(t1_prev, t2_prev);
+                    print_ts(clockdiff);
+                    cout << "Clock drift since start: ";
+                    print_ts( subtract_ts(clockdiff, initial_clock_diff) );
+                }
+
                 rtt_soft = subtract_ts(t4_prev, t1_prev);
                 delay_on_refl = subtract_ts(t3_prev, t2_prev);
                 rtt_hard = subtract_ts(rtt_soft, delay_on_refl);
 
-                printf("rtt_soft %ld.%09ld\n",
-                       (long)rtt_soft.tv_sec,
-                       (long)rtt_soft.tv_nsec);
-                printf("rtt_hard %ld.%09ld\n",
-                       (long)rtt_hard.tv_sec,
-                       (long)rtt_hard.tv_nsec);
+                cout << "rtt soft: ";
+                print_ts(rtt_soft);
+                cout << "rtt hard: ";
+                print_ts(rtt_hard);
             }
             else
             {
@@ -124,7 +143,7 @@ int main(int argc, char *argv[])
             cout << "Sleeping...\n";
             timespec currtime;
             clock_gettime(CLOCK_MONOTONIC, &currtime);
-            const long long int INTERVAL_NANOSEC = 1000000;
+            const long long int INTERVAL_NANOSEC = 1000000000;
             int remain_sleeplen_ns = -1* (currtime.tv_nsec % INTERVAL_NANOSEC) + INTERVAL_NANOSEC;
             cout << "sleeplen " << remain_sleeplen_ns << '\n';
             result = usleep(remain_sleeplen_ns/1000);

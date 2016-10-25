@@ -44,6 +44,7 @@ struct ReflectorPacket
     timestamp_t t3_nsec;
 };
 
+bool operator==(const timespec& t1, const timespec& t2);
 bool operator!=(const timespec& t1, const timespec& t2);
 void print_ts(const timespec& ts);
 timespec subtract_ts(const timespec& newer, const timespec& older);

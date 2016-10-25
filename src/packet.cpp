@@ -1,7 +1,7 @@
 #include <memory>
 #include <type_traits>
 #include <iostream>
-
+#include <iomanip>
 #include <cstring>
 #include <cassert>
 
@@ -37,23 +37,36 @@ template<class T1> T1 serialize(T1 val)
 namespace Netrounds
 {
 
-bool operator!=(const timespec& t1, const timespec& t2)
+bool operator==(const timespec& t1, const timespec& t2)
 {
     if (t1.tv_sec == t2.tv_sec && t1.tv_nsec == t2.tv_nsec)
     {
-        return false;
+        return true;
     }
     else
     {
-        return true;
+        return false;
     }
+}
+
+bool operator!=(const timespec& t1, const timespec& t2)
+{
+    return (!(t1 == t2));
 }
 
 void print_ts(const timespec& ts)
 {
-    printf("%ld.%09ld\n",
-           (long)ts.tv_sec,
-           (long)ts.tv_nsec);
+    const int BUFSZ = 50;
+    char buf[BUFSZ];
+    snprintf(buf, BUFSZ, "[%ld]:[%09ld]",
+             (long)ts.tv_sec,
+             (long)ts.tv_nsec);
+    cout << buf;
+    cout << std::fixed;
+    //cout << std::setfill('0') << std::setprecision(9);
+    cout << std::setprecision(9);
+    //cout << '[' << ts.tv_sec << "]:[" << ts.tv_nsec << ']';
+    cout  << "    " << (ts.tv_sec + (double)ts.tv_nsec/1000000000) << '\n';
 }
 
 timespec subtract_ts(const timespec& newer, const timespec& older)
