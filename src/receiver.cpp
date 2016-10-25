@@ -26,12 +26,28 @@ using namespace Netrounds;
 void receive_loop(string address, in_port_t listen_port, int domain, string iface_name)
 {
     int sock;
-    const time_t SLEEP_TIME = 5;
+    const time_t SLEEP_TIME = 20;
     shared_ptr<char> data;
     int datalen = 0;
     sockaddr_storage ss;
     sockaddr_storage bind_addr;
     uint32_t prev_sender_seq = 0;
+
+    fd_set efds;
+    fd_set rfds;
+    timespec ts;
+    int retval;
+
+    shared_ptr<SenderPacket> pkt;
+    shared_ptr<ReflectorPacket> retpkt;
+
+    timespec t2;
+    timespec t2_prev;
+    timespec t3_prev;
+
+    memset(&t2, 0, sizeof(t2));
+    memset(&t2_prev, 0, sizeof(t2_prev));
+    memset(&t3_prev, 0, sizeof(t3_prev));
 
     sock = setup_socket(domain, SOCK_DGRAM, SOF_TIMESTAMPING_TX_HARDWARE | SOF_TIMESTAMPING_RX_HARDWARE | SOF_TIMESTAMPING_RAW_HARDWARE);
     set_nonblocking(sock);
@@ -43,19 +59,6 @@ void receive_loop(string address, in_port_t listen_port, int domain, string ifac
     uint32_t refl_counter = 1234;
     for (;;)
     {
-        fd_set efds;
-        fd_set rfds;
-        timespec ts;
-        int retval;
-
-        timespec t2;
-        timespec t2_prev;
-        timespec t3_prev;
-
-        memset(&t2, 0, sizeof(t2));
-        memset(&t2_prev, 0, sizeof(t2_prev));
-        memset(&t3_prev, 0, sizeof(t3_prev));
-
         FD_ZERO(&efds);
         FD_ZERO(&rfds);
         FD_SET(sock, &efds);
@@ -79,16 +82,18 @@ void receive_loop(string address, in_port_t listen_port, int domain, string ifac
         if (FD_ISSET(sock, &rfds))
         {
             t2_prev = t2;
+            cout << "Assigned t2_prev "; print_ts(t2_prev);
             tie(data, datalen, ss, t2) = recvpacket(sock, 0);
+            cout << "Got new T2 "; print_ts(t2);
             if (datalen == 0)
             {
                 cout << "sock marked as readable by select(), but no data read!\n";
                 continue;
             }
-            shared_ptr<SenderPacket> pkt = deserialize_packet(data.get(), datalen);
+            pkt = deserialize_packet(data.get(), datalen);
 
             // bounce the packet back
-            shared_ptr<ReflectorPacket> retpkt(new ReflectorPacket);
+            retpkt.reset(new ReflectorPacket);
             memset(retpkt.get(), 0, sizeof(*retpkt));
             retpkt->type = FROM_REFLECTOR;
             retpkt->sender_seq = pkt->sender_seq;
@@ -113,6 +118,8 @@ void receive_loop(string address, in_port_t listen_port, int domain, string ifac
             cout << "Sent reply, now get HW send timestamp...\n";
             wait_for_errqueue_data(sock);
             tie(data, datalen, ss, t3_prev) = receive_send_timestamp(sock);
+            cout << "Got new T3 prev ";
+            print_ts(t3_prev);
             check_seqnr(data, datalen, pkt->sender_seq);
         }
     }
