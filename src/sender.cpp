@@ -56,7 +56,7 @@ int main(int argc, char *argv[])
     timespec initial_clock_diff {0, 0};
     int result;
 
-    orig_buf = cout.rdbuf();
+    INIT_LOGGING();
     DISABLE_OUTPUT();
     try
     {

@@ -25,6 +25,12 @@ void sendpacket(int domain, string address, in_port_t port, int sock, char *buf,
 void sendpacket(sockaddr_storage *ss, int sock, char *buf, size_t buflen);
 
 extern std::streambuf* orig_buf;
+
+inline void INIT_LOGGING()
+{
+    orig_buf = std::cout.rdbuf();
+}
+
 inline void ENABLE_OUTPUT()
 {
     std::cout.rdbuf(orig_buf);
