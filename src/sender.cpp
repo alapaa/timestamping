@@ -1,6 +1,7 @@
 #include <stdexcept>
 #include <string>
-#include <iostream>
+
+//#include <streambuf>
 #include <system_error>
 #include <memory>
 
@@ -55,6 +56,8 @@ int main(int argc, char *argv[])
     timespec initial_clock_diff {0, 0};
     int result;
 
+    orig_buf = cout.rdbuf();
+    DISABLE_OUTPUT();
     try
     {
         if (argc != 6)
@@ -130,10 +133,12 @@ int main(int argc, char *argv[])
                 delay_on_refl = subtract_ts(t3_prev, t2_prev);
                 rtt_hard = subtract_ts(rtt_soft, delay_on_refl);
 
+                ENABLE_OUTPUT();
                 cout << "rtt soft: ";
                 print_ts(rtt_soft);
                 cout << "rtt hard: ";
                 print_ts(rtt_hard);
+                DISABLE_OUTPUT();
             }
             else
             {
@@ -159,5 +164,7 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
+    ENABLE_OUTPUT();
+    cout << "Re-inserted cout default rdbuf.\n";
     return 0;
 }

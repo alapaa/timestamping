@@ -10,7 +10,8 @@
 
 #include "gpl_code_remove.h"
 
-
+// Disable printf:
+#define printf(fmt, ...) (0)
 
 using std::cout;
 

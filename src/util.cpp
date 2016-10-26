@@ -27,6 +27,8 @@ using std::cout;
 using std::tuple;
 using std::shared_ptr;
 
+std::streambuf* orig_buf;
+
 void check_equal_addresses(sockaddr_storage *ss1, sockaddr_storage *ss2)
 {
 
