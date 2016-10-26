@@ -11,12 +11,12 @@
 #include <linux/net_tstamp.h>
 #include <bsd/string.h>
 
+#include "logging.h"
 #include "packet.h"
 #include "util.h"
 #include "sender.h"
 
 using std::stoi;
-using std::cout;
 using std::string;
 using std::tuple;
 using std::shared_ptr;
@@ -75,19 +75,19 @@ void receive_loop(string address, in_port_t listen_port, int domain, string ifac
         }
         if (retval == 0)
         {
-            cout << "Slept " << SLEEP_TIME << " seconds without traffic...\n";
+            logger << "Slept " << SLEEP_TIME << " seconds without traffic...\n";
             continue;
         }
 
         if (FD_ISSET(sock, &rfds))
         {
             t2_prev = t2;
-            cout << "Assigned t2_prev "; print_ts(t2_prev);
+            logger << "Assigned t2_prev "; print_ts(t2_prev);
             tie(data, datalen, ss, t2) = recvpacket(sock, 0);
-            cout << "Got new T2 "; print_ts(t2);
+            logger << "Got new T2 "; print_ts(t2);
             if (datalen == 0)
             {
-                cout << "sock marked as readable by select(), but no data read!\n";
+                logger << "sock marked as readable by select(), but no data read!\n";
                 continue;
             }
             pkt = deserialize_packet(data.get(), datalen);
@@ -100,7 +100,7 @@ void receive_loop(string address, in_port_t listen_port, int domain, string ifac
             retpkt->refl_seq = refl_counter++;
             if (prev_sender_seq == (pkt->sender_seq - 1))
             {
-                cout << "OK, piggybacking prev pkt T2 and T3, prev pkt seqnr " << prev_sender_seq << '\n';
+                logger << "OK, piggybacking prev pkt T2 and T3, prev pkt seqnr " << prev_sender_seq << '\n';
                 print_ts(t2_prev);
                 print_ts(t3_prev);
                 retpkt->t2_sec = t2_prev.tv_sec;
@@ -110,15 +110,15 @@ void receive_loop(string address, in_port_t listen_port, int domain, string ifac
             }
             else
             {
-                cout << "Missed prev pkt, cannot piggyback hw timestaps\n";
+                logger << "Missed prev pkt, cannot piggyback hw timestaps\n";
             }
             prev_sender_seq = pkt->sender_seq;
             tie(data, datalen) = serialize_reflector_packet(retpkt);
             sendpacket(&ss, sock, data.get(), datalen);
-            cout << "Sent reply, now get HW send timestamp...\n";
+            logger << "Sent reply, now get HW send timestamp...\n";
             wait_for_errqueue_data(sock);
             tie(data, datalen, ss, t3_prev) = receive_send_timestamp(sock);
-            cout << "Got new T3 prev ";
+            logger << "Got new T3 prev ";
             print_ts(t3_prev);
             check_seqnr(data, datalen, pkt->sender_seq);
         }
@@ -148,12 +148,12 @@ int main(int argc, char *argv[])
             domain = ipver == 6 ? AF_INET6 : AF_INET;
             iface_name = string(argv[4]);
         }
-
+        INIT_LOGGING("/tmp/tslog.txt", LOG_DEBUG);
         receive_loop(address, port, domain, iface_name);
     }
     catch (std::exception &exc)
     {
-        cout << "Got exception: " << exc.what() << '\n';
+        logger << "Got exception: " << exc.what() << '\n';
         exit(1);
     }
 

@@ -20,14 +20,16 @@
 #include <linux/net_tstamp.h>
 #include <linux/errqueue.h>
 
+#include "logging.h"
 #include "util.h"
 #include "gpl_code_remove.h"
 
 using std::cout;
 using std::tuple;
 using std::shared_ptr;
+using std::string;
 
-std::streambuf* orig_buf;
+using namespace Netrounds;
 
 void check_equal_addresses(sockaddr_storage *ss1, sockaddr_storage *ss2)
 {
@@ -99,14 +101,14 @@ void setup_device(int sock, string iface_name, int so_timestamping_flags)
             hwconfig_requested.tx_type == HWTSTAMP_TX_OFF &&
             hwconfig_requested.rx_filter == HWTSTAMP_FILTER_NONE)
         {
-            cout << "SIOCSHWTSTAMP: disabling hardware time stamping not possible\n";
+            logger << "SIOCSHWTSTAMP: disabling hardware time stamping not possible\n";
         }
         else
         {
             throw std::system_error(errno, std::system_category());
         }
     }
-    cout << "SIOCSHWTSTAMP: tx_type " << hwconfig_requested.tx_type << " requested, got " << hwconfig.tx_type <<
+    logger << "SIOCSHWTSTAMP: tx_type " << hwconfig_requested.tx_type << " requested, got " << hwconfig.tx_type <<
         "; rx_filter " << hwconfig_requested.rx_filter << " requested, got " << hwconfig.rx_filter << '\n';
 }
 
@@ -141,10 +143,10 @@ int setup_socket(int domain, int type, int so_timestamping_flags)
     }
     else
     {
-        cout << "SO_TIMESTAMPING " << val << '\n';
+        logger << "SO_TIMESTAMPING " << val << '\n';
         if (val != so_timestamping_flags)
         {
-            cout << "Not the expected value " << so_timestamping_flags;
+            logger << "Not the expected value " << so_timestamping_flags;
         }
     }
 
@@ -165,7 +167,7 @@ void sendpacket(int domain, string address, in_port_t port, int sock, char *buf,
     sockaddr_storage ss;
     create_sockaddr_storage(domain, address, port, &ss);
 
-    cout << "Sending, ip addr " << address << " domain " << (domain == AF_INET ? "AF_INET" : "AF_INET6") << '\n';
+    logger << "Sending, ip addr " << address << " domain " << (domain == AF_INET ? "AF_INET" : "AF_INET6") << '\n';
     sendpacket(&ss, sock, buf, buflen);
 }
 
@@ -181,7 +183,7 @@ void sendpacket(sockaddr_storage *ss, int sock, char *buf, size_t buflen)
     {
         throw std::system_error(errno, std::system_category());
     }
-    cout << "Sending to " << addrstr << '\n';
+    logger << "Sending to " << addrstr << '\n';
 #endif
 
     // TODO: Handle EAGAIN better.
@@ -192,20 +194,20 @@ void sendpacket(sockaddr_storage *ss, int sock, char *buf, size_t buflen)
         {
             if (errno == EAGAIN || errno == EWOULDBLOCK)
             {
-                cout << "Got EAGAIN/EWOULDBLOCK, doing sleep/retry\n";
+                logger << "Got EAGAIN/EWOULDBLOCK, doing sleep/retry\n";
                 sleep(1);
                 continue;
             }
             throw std::system_error(errno, std::system_category());
         }
-        cout << "Sent " << result << " bytes\n";
+        logger << "Sent " << result << " bytes\n";
         break;
     }
 }
 
 tuple<shared_ptr<char>, int, sockaddr_storage, timespec> recvpacket(int sock, int recvmsg_flags)
 {
-    const size_t MAX_LEN = 9000;
+    const size_t MAX_LEN = 1600;
     shared_ptr<char> data(new char[MAX_LEN]); // TODO: Change to vector<char> or maybe shared_array
     sockaddr_storage from_addr;
     msghdr msg;
@@ -232,13 +234,13 @@ tuple<shared_ptr<char>, int, sockaddr_storage, timespec> recvpacket(int sock, in
     int retry_count = 0;
     for (;;)
     {
-        cout << "Doing recvmsg, flags " << recvmsg_flags << '\n';
+        logger << "Doing recvmsg, flags " << recvmsg_flags << '\n';
         len = recvmsg(sock, &msg, recvmsg_flags);
         if (len == -1)
         {
             if (errno == EAGAIN || errno == EWOULDBLOCK)
             {
-                cout << "Got EAGAIN/EWOULDBLOCK, doing sleep/retry\n";
+                logger << "Got EAGAIN/EWOULDBLOCK, doing sleep/retry\n";
                 sleep(1);
                 if (retry_count++ < 3)
                 {
@@ -246,7 +248,7 @@ tuple<shared_ptr<char>, int, sockaddr_storage, timespec> recvpacket(int sock, in
                 }
                 else
                 {
-                    cout << "Could not receive on sock, giving up for now...\n";
+                    logger << "Could not receive on sock, giving up for now...\n";
                     timespec null_ts;
                     null_ts.tv_sec = 0;
                     null_ts.tv_nsec = 0;
@@ -277,7 +279,7 @@ tuple<shared_ptr<char>, int, sockaddr_storage, timespec> receive_send_timestamp(
 
     //tie(data, datalen, ss, hwts) = recvpacket(sock, MSG_ERRQUEUE);
 
-    //cout << "as char: " << data.get()+42 << '\n';
+    //logger << "as char: " << data.get()+42 << '\n';
     // char tmp[1500];
     // const int offset = 42;
     // memcpy(tmp, data.get()+offset, 1500); // TODO: 42 is not divisible by word-length 4 bytes. Can we avoid copy?
@@ -285,7 +287,7 @@ tuple<shared_ptr<char>, int, sockaddr_storage, timespec> receive_send_timestamp(
 
     // for (int i = 0; i < 3; i++)
     // {
-    //     cout << "word " << i << " of packet payload from MSG_ERRQUEUE: " << htonl(*(wp+i)) << '\n';
+    //     logger << "word " << i << " of packet payload from MSG_ERRQUEUE: " << htonl(*(wp+i)) << '\n';
     // }
 
     return recvpacket(sock, MSG_ERRQUEUE);
@@ -351,10 +353,10 @@ void wait_for_errqueue_data(int sock)
     }
     else if(retval)
     {
-        cout << "Data is available now.\n";
+        logger << "Data is available now.\n";
     }
     else
     {
-        cout << "No data within five seconds.\n";
+        logger << "No data within five seconds.\n";
     }
 }

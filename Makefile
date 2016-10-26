@@ -113,5 +113,5 @@ gtest_main.a: gtest-all.o gtest_main.o
 # function.
 
 # Uses libbsd from libbsd-dev pkg to get strlcpy.
-test_util: src/util.o src/gpl_code_remove.o $(TEST_OBJECTS) gtest_main.a
+test_util: src/logging.o src/util.o src/gpl_code_remove.o $(TEST_OBJECTS) gtest_main.a
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $^ $(LDFLAGS) -o $@
