@@ -24,12 +24,28 @@ enum loglevel
 extern std::ofstream _log_stream;
 extern loglevel _level;
 
-#define logger         \
-    if (_level < LOG_DEBUG) { std::cout << "no logging\n";} \
-    else std::cout
+//#define _lstream _log_stream
+#define _lstream std::cout
 
+#define logcrit               \
+    if (_level < LOG_CRIT) {} \
+    else _lstream
 
-extern std::streambuf* _orig_buf;
+#define logerr               \
+    if (_level < LOG_ERR) {} \
+    else _lstream
+
+#define logwarning               \
+    if (_level < LOG_WARNING) {} \
+    else _lstream
+
+#define loginfo               \
+    if (_level < LOG_INFO) {} \
+    else _lstream
+
+#define logdebug               \
+    if (_level < LOG_DEBUG) {} \
+    else _lstream
 
 inline void INIT_LOGGING(std::string fname, loglevel level = LOG_ERR)
 {

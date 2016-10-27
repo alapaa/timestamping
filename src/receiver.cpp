@@ -75,19 +75,19 @@ void receive_loop(string address, in_port_t listen_port, int domain, string ifac
         }
         if (retval == 0)
         {
-            logger << "Slept " << SLEEP_TIME << " seconds without traffic...\n";
+            logdebug << "Slept " << SLEEP_TIME << " seconds without traffic...\n";
             continue;
         }
 
         if (FD_ISSET(sock, &rfds))
         {
             t2_prev = t2;
-            logger << "Assigned t2_prev "; print_ts(t2_prev);
+            logdebug << "Assigned t2_prev "; print_ts(t2_prev);
             tie(data, datalen, ss, t2) = recvpacket(sock, 0);
-            logger << "Got new T2 "; print_ts(t2);
+            logdebug << "Got new T2 "; print_ts(t2);
             if (datalen == 0)
             {
-                logger << "sock marked as readable by select(), but no data read!\n";
+                logdebug << "sock marked as readable by select(), but no data read!\n";
                 continue;
             }
             pkt = deserialize_packet(data.get(), datalen);
@@ -100,7 +100,7 @@ void receive_loop(string address, in_port_t listen_port, int domain, string ifac
             retpkt->refl_seq = refl_counter++;
             if (prev_sender_seq == (pkt->sender_seq - 1))
             {
-                logger << "OK, piggybacking prev pkt T2 and T3, prev pkt seqnr " << prev_sender_seq << '\n';
+                logdebug << "OK, piggybacking prev pkt T2 and T3, prev pkt seqnr " << prev_sender_seq << '\n';
                 print_ts(t2_prev);
                 print_ts(t3_prev);
                 retpkt->t2_sec = t2_prev.tv_sec;
@@ -110,15 +110,15 @@ void receive_loop(string address, in_port_t listen_port, int domain, string ifac
             }
             else
             {
-                logger << "Missed prev pkt, cannot piggyback hw timestaps\n";
+                logdebug << "Missed prev pkt, cannot piggyback hw timestaps\n";
             }
             prev_sender_seq = pkt->sender_seq;
             tie(data, datalen) = serialize_reflector_packet(retpkt);
             sendpacket(&ss, sock, data.get(), datalen);
-            logger << "Sent reply, now get HW send timestamp...\n";
+            logdebug << "Sent reply, now get HW send timestamp...\n";
             wait_for_errqueue_data(sock);
             tie(data, datalen, ss, t3_prev) = receive_send_timestamp(sock);
-            logger << "Got new T3 prev ";
+            logdebug << "Got new T3 prev ";
             print_ts(t3_prev);
             check_seqnr(data, datalen, pkt->sender_seq);
         }
@@ -153,7 +153,7 @@ int main(int argc, char *argv[])
     }
     catch (std::exception &exc)
     {
-        logger << "Got exception: " << exc.what() << '\n';
+        logdebug << "Got exception: " << exc.what() << '\n';
         exit(1);
     }
 

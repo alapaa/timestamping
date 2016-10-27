@@ -101,14 +101,14 @@ void setup_device(int sock, string iface_name, int so_timestamping_flags)
             hwconfig_requested.tx_type == HWTSTAMP_TX_OFF &&
             hwconfig_requested.rx_filter == HWTSTAMP_FILTER_NONE)
         {
-            logger << "SIOCSHWTSTAMP: disabling hardware time stamping not possible\n";
+            logdebug << "SIOCSHWTSTAMP: disabling hardware time stamping not possible\n";
         }
         else
         {
             throw std::system_error(errno, std::system_category());
         }
     }
-    logger << "SIOCSHWTSTAMP: tx_type " << hwconfig_requested.tx_type << " requested, got " << hwconfig.tx_type <<
+    logdebug << "SIOCSHWTSTAMP: tx_type " << hwconfig_requested.tx_type << " requested, got " << hwconfig.tx_type <<
         "; rx_filter " << hwconfig_requested.rx_filter << " requested, got " << hwconfig.rx_filter << '\n';
 }
 
@@ -143,10 +143,10 @@ int setup_socket(int domain, int type, int so_timestamping_flags)
     }
     else
     {
-        logger << "SO_TIMESTAMPING " << val << '\n';
+        logdebug << "SO_TIMESTAMPING " << val << '\n';
         if (val != so_timestamping_flags)
         {
-            logger << "Not the expected value " << so_timestamping_flags;
+            logdebug << "Not the expected value " << so_timestamping_flags;
         }
     }
 
@@ -167,7 +167,7 @@ void sendpacket(int domain, string address, in_port_t port, int sock, char *buf,
     sockaddr_storage ss;
     create_sockaddr_storage(domain, address, port, &ss);
 
-    logger << "Sending, ip addr " << address << " domain " << (domain == AF_INET ? "AF_INET" : "AF_INET6") << '\n';
+    logdebug << "Sending, ip addr " << address << " domain " << (domain == AF_INET ? "AF_INET" : "AF_INET6") << '\n';
     sendpacket(&ss, sock, buf, buflen);
 }
 
@@ -183,7 +183,7 @@ void sendpacket(sockaddr_storage *ss, int sock, char *buf, size_t buflen)
     {
         throw std::system_error(errno, std::system_category());
     }
-    logger << "Sending to " << addrstr << '\n';
+    logdebug << "Sending to " << addrstr << '\n';
 #endif
 
     // TODO: Handle EAGAIN better.
@@ -194,13 +194,13 @@ void sendpacket(sockaddr_storage *ss, int sock, char *buf, size_t buflen)
         {
             if (errno == EAGAIN || errno == EWOULDBLOCK)
             {
-                logger << "Got EAGAIN/EWOULDBLOCK, doing sleep/retry\n";
+                logdebug << "Got EAGAIN/EWOULDBLOCK, doing sleep/retry\n";
                 sleep(1);
                 continue;
             }
             throw std::system_error(errno, std::system_category());
         }
-        logger << "Sent " << result << " bytes\n";
+        logdebug << "Sent " << result << " bytes\n";
         break;
     }
 }
@@ -234,13 +234,13 @@ tuple<shared_ptr<char>, int, sockaddr_storage, timespec> recvpacket(int sock, in
     int retry_count = 0;
     for (;;)
     {
-        logger << "Doing recvmsg, flags " << recvmsg_flags << '\n';
+        logdebug << "Doing recvmsg, flags " << recvmsg_flags << '\n';
         len = recvmsg(sock, &msg, recvmsg_flags);
         if (len == -1)
         {
             if (errno == EAGAIN || errno == EWOULDBLOCK)
             {
-                logger << "Got EAGAIN/EWOULDBLOCK, doing sleep/retry\n";
+                logdebug << "Got EAGAIN/EWOULDBLOCK, doing sleep/retry\n";
                 sleep(1);
                 if (retry_count++ < 3)
                 {
@@ -248,7 +248,7 @@ tuple<shared_ptr<char>, int, sockaddr_storage, timespec> recvpacket(int sock, in
                 }
                 else
                 {
-                    logger << "Could not receive on sock, giving up for now...\n";
+                    logdebug << "Could not receive on sock, giving up for now...\n";
                     timespec null_ts;
                     null_ts.tv_sec = 0;
                     null_ts.tv_nsec = 0;
@@ -279,7 +279,7 @@ tuple<shared_ptr<char>, int, sockaddr_storage, timespec> receive_send_timestamp(
 
     //tie(data, datalen, ss, hwts) = recvpacket(sock, MSG_ERRQUEUE);
 
-    //logger << "as char: " << data.get()+42 << '\n';
+    //logdebug << "as char: " << data.get()+42 << '\n';
     // char tmp[1500];
     // const int offset = 42;
     // memcpy(tmp, data.get()+offset, 1500); // TODO: 42 is not divisible by word-length 4 bytes. Can we avoid copy?
@@ -287,7 +287,7 @@ tuple<shared_ptr<char>, int, sockaddr_storage, timespec> receive_send_timestamp(
 
     // for (int i = 0; i < 3; i++)
     // {
-    //     logger << "word " << i << " of packet payload from MSG_ERRQUEUE: " << htonl(*(wp+i)) << '\n';
+    //     logdebug << "word " << i << " of packet payload from MSG_ERRQUEUE: " << htonl(*(wp+i)) << '\n';
     // }
 
     return recvpacket(sock, MSG_ERRQUEUE);
@@ -353,10 +353,10 @@ void wait_for_errqueue_data(int sock)
     }
     else if(retval)
     {
-        logger << "Data is available now.\n";
+        logdebug << "Data is available now.\n";
     }
     else
     {
-        logger << "No data within five seconds.\n";
+        logdebug << "No data within five seconds.\n";
     }
 }
