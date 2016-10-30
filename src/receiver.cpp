@@ -82,9 +82,10 @@ void receive_loop(string address, in_port_t listen_port, int domain, string ifac
         if (FD_ISSET(sock, &rfds))
         {
             t2_prev = t2;
-            logdebug << "Assigned t2_prev "; print_ts(t2_prev);
+            logdebug << "Assigned t2_prev ";
+            logdebug << t2_prev << '\n';
             tie(data, datalen, ss, t2) = recvpacket(sock, 0);
-            logdebug << "Got new T2 "; print_ts(t2);
+            logdebug << "Got new T2 " << t2 << '\n';
             if (datalen == 0)
             {
                 logdebug << "sock marked as readable by select(), but no data read!\n";
@@ -101,8 +102,8 @@ void receive_loop(string address, in_port_t listen_port, int domain, string ifac
             if (prev_sender_seq == (pkt->sender_seq - 1))
             {
                 logdebug << "OK, piggybacking prev pkt T2 and T3, prev pkt seqnr " << prev_sender_seq << '\n';
-                print_ts(t2_prev);
-                print_ts(t3_prev);
+                logdebug << t2_prev << '\n';
+                logdebug << t3_prev << '\n';
                 retpkt->t2_sec = t2_prev.tv_sec;
                 retpkt->t2_nsec = t2_prev.tv_nsec;
                 retpkt->t3_sec = t3_prev.tv_sec;
@@ -119,8 +120,11 @@ void receive_loop(string address, in_port_t listen_port, int domain, string ifac
             wait_for_errqueue_data(sock);
             tie(data, datalen, ss, t3_prev) = receive_send_timestamp(sock);
             logdebug << "Got new T3 prev ";
-            print_ts(t3_prev);
-            check_seqnr(data, datalen, pkt->sender_seq);
+            logdebug << t3_prev << '\n';
+            if (!check_seqnr(data, datalen, pkt->sender_seq))
+            {
+                throw std::runtime_error("Seq nr check failed!");
+            }
         }
     }
 }

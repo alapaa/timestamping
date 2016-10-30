@@ -53,6 +53,7 @@ int main(int argc, char *argv[])
     timespec delay_on_refl;
 
     timespec initial_clock_diff {0, 0};
+    timespec initial_time {0, 0};
     int result;
 
     INIT_LOGGING("/tmp/tslog.txt", LOG_INFO);
@@ -102,10 +103,10 @@ int main(int argc, char *argv[])
             t2_prev = make_timespec(rp->t2_sec, rp->t2_nsec);
             t3_prev = make_timespec(rp->t3_sec, rp->t3_nsec);
 
-            print_ts(t1_prev);
-            print_ts(t2_prev);
-            print_ts(t3_prev);
-            print_ts(t4_prev);
+            logdebug << t1_prev << '\n';
+            logdebug << t2_prev << '\n';
+            logdebug << t3_prev << '\n';
+            logdebug << t4_prev << '\n';
 
             if (t1_prev != ZERO_TS && t4_prev != ZERO_TS &&
                 t2_prev != ZERO_TS && t3_prev != ZERO_TS)
@@ -113,38 +114,43 @@ int main(int argc, char *argv[])
                 if (initial_clock_diff == ZERO_TS)
                 {
                     initial_clock_diff = subtract_ts(t1_prev, t2_prev);
+                    initial_time = t1_prev;
                     logdebug << "Setting initial clock diff: ";
-                    print_ts(initial_clock_diff);
+                    logdebug << initial_clock_diff;
                     logdebug << '\n';
                 }
                 else
                 {
                     logdebug << "Showing initial clock diff: ";
-                    print_ts(initial_clock_diff);
+                    logdebug << initial_clock_diff;
                     logdebug << '\n';
 
                     logdebug << "Clock diff sender<->reflector: ";
                     timespec clockdiff = subtract_ts(t1_prev, t2_prev);
-                    print_ts(clockdiff);
+                    logdebug << clockdiff << '\n';
                     loginfo << "Clock drift since start: ";
-                    print_ts( subtract_ts(clockdiff, initial_clock_diff) );
+                    timespec drift = subtract_ts(clockdiff, initial_clock_diff);
+                    timespec time_elapsed = subtract_ts(t1_prev, initial_time);
+                    loginfo << drift << '\n';
+                    loginfo << "Clock drift as ppm: " << 1E6 * (drift.tv_sec + drift.tv_nsec / 1E9) /
+                        (time_elapsed.tv_sec + time_elapsed.tv_nsec / 1E9) << '\n';
                 }
 
                 rtt_soft = subtract_ts(t4_prev, t1_prev);
                 delay_on_refl = subtract_ts(t3_prev, t2_prev);
                 rtt_hard = subtract_ts(rtt_soft, delay_on_refl);
 
-                if (send_counter % 1000 == 0)
+                if (send_counter % 10 == 0)
                 {
-                    logdebug << "rtt soft: ";
-                    print_ts(rtt_soft);
+                    loginfo << "rtt soft: ";
+                    loginfo << rtt_soft << '\n';
                     loginfo << "rtt hard: ";
-                    print_ts(rtt_hard);
+                    loginfo << rtt_hard << '\n';
                 }
             }
             else
             {
-                logdebug << "---- missing values in 4-tuple T1 - T4, cannot compute\n";
+                loginfo << "---- missing values in 4-tuple T1 - T4, cannot compute\n";
             }
 
             logdebug << "Sleeping...\n";
@@ -161,7 +167,7 @@ int main(int argc, char *argv[])
     }
     catch (std::exception &exc)
     {
-        logdebug << "Got exception: " << exc.what() << '\n';
+        logerr << "Got exception: " << exc.what() << '\n';
         exit(1);
     }
 

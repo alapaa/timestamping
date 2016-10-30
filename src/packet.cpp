@@ -1,21 +1,23 @@
 #include <memory>
 #include <type_traits>
+#include <string>
 #include <iostream>
 #include <iomanip>
+#include <sstream>
 #include <cstring>
 #include <cassert>
 
 #include <arpa/inet.h>
 
 #include "packet.h"
+#include "logging.h"
 
-using std::cout;
-
-//using Netrounds::SenderPacket;
-//using Netrounds::PacketType;
-
+//using std::cout;
+using std::ostream;
+using std::stringstream;
 using std::shared_ptr;
 using std::tuple;
+using std::string;
 
 template<class T1> T1 serialize(T1 val)
 {
@@ -54,19 +56,28 @@ bool operator!=(const timespec& t1, const timespec& t2)
     return (!(t1 == t2));
 }
 
-void print_ts(const timespec& ts)
+string ts2string(const timespec& ts)
 {
-    const int BUFSZ = 50;
-    char buf[BUFSZ];
-    snprintf(buf, BUFSZ, "[%ld]:[%09ld]",
-             (long)ts.tv_sec,
-             (long)ts.tv_nsec);
-    cout << buf;
-    cout << std::fixed;
+    stringstream ss;
+
+    // const int BUFSZ = 50;
+    // char buf[BUFSZ];
+    // snprintf(buf, BUFSZ, "[%ld]:[%09ld]",
+    //          (long)ts.tv_sec,
+    //          (long)ts.tv_nsec);
+    // ss << buf;
+    ss << std::fixed;
     //cout << std::setfill('0') << std::setprecision(9);
-    cout << std::setprecision(9);
+    ss << std::setprecision(9);
     //cout << '[' << ts.tv_sec << "]:[" << ts.tv_nsec << ']';
-    cout  << "    " << (ts.tv_sec + (double)ts.tv_nsec/1000000000) << '\n';
+    ss  << "    " << (ts.tv_sec + (double)ts.tv_nsec/1000000000);
+
+    return ss.str();
+}
+
+ostream& operator<<(ostream& os, const timespec& ts)
+{
+    return os << ts2string(ts);
 }
 
 timespec subtract_ts(const timespec& newer, const timespec& older)
@@ -113,8 +124,8 @@ shared_ptr<SenderPacket> deserialize_packet(char *data, size_t datalen)
     assert(pkt->type == FROM_SENDER);
     pkt->sender_seq = ntohl(pkt->sender_seq);
 
-    cout << "Packet type:" << pkt->type << '\n';
-    cout << "Packet sender_seq: " << pkt->sender_seq << '\n';
+    logdebug << "Packet type:" << pkt->type << '\n';
+    logdebug << "Packet sender_seq: " << pkt->sender_seq << '\n';
 
     return pkt;
 }
@@ -171,13 +182,13 @@ bool check_seqnr(shared_ptr<char> data, int datalen, uint32_t seqnr)
     uint32_t *p = (uint32_t *)(data.get() + offset);
     if (ntohl(*p) != FROM_REFLECTOR)
     {
-        cout << "Wrong packet type, expected " << FROM_REFLECTOR << " got " << ntohl(*p) << '\n';
+        logerr << "Wrong packet type, expected " << FROM_REFLECTOR << " got " << ntohl(*p) << '\n';
         return false;
     }
     p += sizeof(ReflectorPacket::type)/sizeof(uint32_t);
     if (ntohl(*p) != seqnr)
     {
-        cout << "Expected seqnr " << seqnr << ", got " << ntohl(*p) << "!\n";
+        logerr << "Expected seqnr " << seqnr << ", got " << ntohl(*p) << "!\n";
         return false;
     }
     else

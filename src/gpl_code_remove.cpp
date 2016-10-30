@@ -110,8 +110,8 @@ void printpacket(struct msghdr *msg, int res,
                     (struct in_pktinfo *)CMSG_DATA(cmsg);
                 printf("IP_PKTINFO interface index %u, ",
                     pktinfo->ipi_ifindex);
-                tmpaddr = pktinfo->ipi_addr;
-                cout << "message received on address " << inet_ntoa(tmpaddr) << '\n';
+                //tmpaddr = pktinfo->ipi_addr;
+                //cout << "message received on address " << inet_ntoa(tmpaddr) << '\n';
                 break;
             }
             default:

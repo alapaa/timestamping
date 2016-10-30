@@ -46,7 +46,7 @@ struct ReflectorPacket
 
 bool operator==(const timespec& t1, const timespec& t2);
 bool operator!=(const timespec& t1, const timespec& t2);
-void print_ts(const timespec& ts);
+std::ostream& operator<<(std::ostream& os, const timespec& ts);
 timespec subtract_ts(const timespec& newer, const timespec& older);
 timespec make_timespec(timestamp_t tv_sec, timestamp_t tv_nsec);
 void prepare_packet(char* buf, size_t buflen, uint32_t seq);
