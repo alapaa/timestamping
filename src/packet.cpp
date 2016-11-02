@@ -60,17 +60,14 @@ string ts2string(const timespec& ts)
 {
     stringstream ss;
 
-    // const int BUFSZ = 50;
-    // char buf[BUFSZ];
-    // snprintf(buf, BUFSZ, "[%ld]:[%09ld]",
-    //          (long)ts.tv_sec,
-    //          (long)ts.tv_nsec);
-    // ss << buf;
     ss << std::fixed;
-    //cout << std::setfill('0') << std::setprecision(9);
     ss << std::setprecision(9);
-    //cout << '[' << ts.tv_sec << "]:[" << ts.tv_nsec << ']';
     ss  << "    " << (ts.tv_sec + (double)ts.tv_nsec/1000000000);
+
+    if (ts.tv_sec == 0)
+    {
+        ss << " (" << ts.tv_nsec/1000 << " [microseconds])";
+    }
 
     return ss.str();
 }
