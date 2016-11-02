@@ -128,15 +128,20 @@ int setup_socket(int domain, int type, int so_timestamping_flags)
     }
 
     // Request timestamping
+    loginfo << "Setting SO_TIMESTAMPING flags on socket... ";
     int result = setsockopt(sock, SOL_SOCKET, SO_TIMESTAMPING, (void *) &so_timestamping_flags,
                             sizeof(so_timestamping_flags));
     if (result == -1)
     {
+        logerr << "Failed!\n";
         throw std::system_error(errno, std::system_category());
     }
+    loginfo << "OK!\n";
 
+    loginfo << "Checking SO_TIMESTAMPING flags... ";
     len = sizeof(val);
     result = getsockopt(sock, SOL_SOCKET, SO_TIMESTAMPING, &val, &len);
+    loginfo << "Got result " << result << '\n';
     if (result == -1)
     {
         throw std::system_error(errno, std::system_category());
@@ -146,7 +151,11 @@ int setup_socket(int domain, int type, int so_timestamping_flags)
         logdebug << "SO_TIMESTAMPING " << val << '\n';
         if (val != so_timestamping_flags)
         {
-            logdebug << "Not the expected value " << so_timestamping_flags;
+            loginfo << "Not the expected value of SO_TIMESTAMPING flags: " << so_timestamping_flags;
+        }
+        else
+        {
+            loginfo << "Flags OK!\n";
         }
     }
 

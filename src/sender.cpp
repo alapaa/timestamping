@@ -75,7 +75,13 @@ int main(int argc, char *argv[])
         }
 
         const long long int INTERVAL_NANOSEC = send_interval * 1000000;
-        sock = setup_socket(domain, SOCK_DGRAM, SOF_TIMESTAMPING_TX_HARDWARE | SOF_TIMESTAMPING_RX_HARDWARE | SOF_TIMESTAMPING_RAW_HARDWARE);
+        sock = setup_socket(domain, SOCK_DGRAM,
+                            SOF_TIMESTAMPING_TX_HARDWARE |
+                            SOF_TIMESTAMPING_RX_HARDWARE |
+                            SOF_TIMESTAMPING_RAW_HARDWARE |
+                            SOF_TIMESTAMPING_TX_SOFTWARE |
+                            SOF_TIMESTAMPING_RX_SOFTWARE |
+                            SOF_TIMESTAMPING_SOFTWARE);
         setup_device(sock, iface_name, SOF_TIMESTAMPING_TX_HARDWARE | SOF_TIMESTAMPING_RX_HARDWARE);
 
         uint32_t send_counter = 0;
