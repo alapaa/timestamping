@@ -35,7 +35,7 @@ int sender_thread(string receiver_ip, in_port_t start_port, int nr_streams, cons
 
     sockaddr_in raddr = *reinterpret_cast<sockaddr_in *>(&receiver_addr);
 
-    cout << "Worker " << worker_nr << " starting on CPU " << sched_getcpu() << '\n';
+    // cout << "Worker " << worker_nr << " starting on CPU " << sched_getcpu() << '\n';
 
     for (int i = 0; i < nr_streams; i++)
     {
@@ -101,6 +101,8 @@ int main(int argc, char *argv[])
     pkt_count = new atomic<uint64_t>[nr_workers];
     byte_count = new atomic<uint64_t>[nr_workers];
 
+    cout << "Starting. Using " << nr_workers << " worker threads and " << nr_streams << " streams.\n";
+
     for (int i = 0; i < nr_workers; i++)
     {
         threads.push_back(thread(sender_thread,
@@ -119,9 +121,13 @@ int main(int argc, char *argv[])
         {
             total_bytes += (byte_count+i)->exchange(0);
             total_pkts += (pkt_count+i)->exchange(0);
-            cout << "Nr pkts " << (double)total_pkts << ", nr bytes " << total_bytes <<
-                ", pkts/sec " << ((double)total_pkts)/seconds << '\n';
         }
+        if (seconds % 10 == 0)
+        {
+            cout << "Second " << seconds << ": nr pkts " << (double)total_pkts << ", nr bytes " << total_bytes <<
+            ", pkts/sec " << ((double)total_pkts)/seconds << '\n';
+        }
+
     }
 
     return 0;
