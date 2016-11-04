@@ -42,7 +42,7 @@ int sender_thread(string receiver_ip, in_port_t start_port, int nr_streams, cons
         sockets[i] = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
         if (sockets[i] == -1)
         {
-            throw std::system_error(errno, std::system_category(), string(__FILE__) + string(to_string(__LINE__)));
+            throw std::system_error(errno, std::system_category(), FILELINE);
         }
     }
 
@@ -54,7 +54,7 @@ int sender_thread(string receiver_ip, in_port_t start_port, int nr_streams, cons
             sent_bytes = sendto(sockets[i], buf, PKT_PAYLOAD, 0, (sockaddr *)&raddr, sizeof(raddr));
             if (sent_bytes == -1)
             {
-                throw std::system_error(errno, std::system_category(), string(__FILE__) + string(to_string(__LINE__)));
+                throw std::system_error(errno, std::system_category(), FILELINE);
             }
             *(byte_count+worker_nr) += sent_bytes;
             (*(pkt_count+worker_nr))++;
@@ -66,7 +66,7 @@ int sender_thread(string receiver_ip, in_port_t start_port, int nr_streams, cons
         result = close(sockets[i]);
         if (result == -1)
         {
-            throw std::system_error(errno, std::system_category(), string(__FILE__) + string(to_string(__LINE__)));
+            throw std::system_error(errno, std::system_category(), FILELINE);
         }
     }
 
