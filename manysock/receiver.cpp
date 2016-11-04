@@ -11,6 +11,7 @@
 #include <sys/epoll.h>
 
 #include "util.h"
+#include "logging.h"
 
 using std::thread;
 using std::vector;
@@ -21,10 +22,10 @@ using std::string;
 using std::stoi;
 using std::to_string;
 
+using namespace Netrounds;
+
 atomic<uint64_t> *byte_count;
 atomic<uint64_t> *pkt_count;
-
-
 
 int receiver_thread(string receiver_ip, in_port_t start_port, int nr_streams, const int worker_nr)
 {
@@ -75,17 +76,22 @@ int receiver_thread(string receiver_ip, in_port_t start_port, int nr_streams, co
         }
     }
 
+    cout << "Added " << nr_streams << " sockets to epoll.\n";
+
     for (;;)
     {
-        nfds = epoll_pwait(epollfd, events, nr_streams, -1, 0);
+        nfds = epoll_pwait(epollfd, events, nr_streams, -1, nullptr);
         if (nfds == -1)
         {
             throw std::system_error(errno, std::system_category(), FILELINE);
         }
         for (int i = 0; i < nfds; i++)
         {
+
+            int pktcount_onesock = 0;
             for (;;) // receive all on socket
             {
+                //logdebug << "events[i].data.fd " << events[i].data.fd << ", ";
                 recv_bytes = recv(events[i].data.fd, buf, sizeof(buf), 0);
                 if (recv_bytes == -1)
                 {
@@ -100,9 +106,9 @@ int receiver_thread(string receiver_ip, in_port_t start_port, int nr_streams, co
                 }
                 else
                 {
+                    pktcount_onesock++;
                     *(byte_count+worker_nr) += recv_bytes;
                     (*(pkt_count+worker_nr))++;
-
                 }
             }
         }
@@ -149,6 +155,7 @@ int main(int argc, char *argv[])
     pkt_count = new atomic<uint64_t>[nr_workers];
     byte_count = new atomic<uint64_t>[nr_workers];
 
+    INIT_LOGGING("/tmp/manysocklog.txt", LOG_DEBUG);
     cout << "Starting. Using " << nr_workers << " worker threads and " << nr_streams << " streams.\n";
 
     for (int i = 0; i < nr_workers; i++)
@@ -172,8 +179,10 @@ int main(int argc, char *argv[])
         }
         if (seconds % 10 == 0)
         {
-            cout << "Second " << seconds << ": nr recv pkts " << (double)total_pkts << ", nr bytes " << total_bytes <<
-            ", pkts/sec " << ((double)total_pkts)/seconds << '\n';
+            cout << "Second " << seconds << ": nr recv pkts " << (double)total_pkts << ", nr bytes "
+                 << (double)total_bytes
+                 << ", pkts/s " << ((double)total_pkts)/seconds << ", bits/s " << ((double)total_bytes*8/seconds)
+                 <<'\n';
         }
 
     }

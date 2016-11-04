@@ -124,8 +124,10 @@ int main(int argc, char *argv[])
         }
         if (seconds % 10 == 0)
         {
-            cout << "Second " << seconds << ": nr pkts " << (double)total_pkts << ", nr bytes " << total_bytes <<
-            ", pkts/sec " << ((double)total_pkts)/seconds << '\n';
+            cout << "Second " << seconds << ": nr pkts " << (double)total_pkts << ", nr bytes "
+                 << (double)total_bytes
+                 << ", pkts/sec " << ((double)total_pkts)/seconds << ", bits/s " << ((double)total_bytes*8/seconds)
+                 << '\n';
         }
 
     }
