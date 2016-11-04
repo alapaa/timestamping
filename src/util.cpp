@@ -273,7 +273,7 @@ tuple<shared_ptr<char>, int, sockaddr_storage, timespec> recvpacket(int sock, in
         else
         {
             timespec hwts;
-            printpacket(&msg, len, sock, recvmsg_flags, 0, 0, &hwts);
+            //printpacket(&msg, len, sock, recvmsg_flags, 0, 0, &hwts);
             return tuple<shared_ptr<char>, int, sockaddr_storage, timespec>(data, len, from_addr, hwts);
         }
     }
