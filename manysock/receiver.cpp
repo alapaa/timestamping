@@ -39,6 +39,8 @@ int receiver_thread(string receiver_ip, in_port_t start_port, int nr_streams, co
     struct epoll_event events[nr_streams];
     int epollfd;
     int nfds;
+    int bufsz = 1000000;
+    socklen_t optlen;
 
     vector<int> sockets(nr_streams);
     sockaddr_storage receiver_addr;
@@ -53,6 +55,21 @@ int receiver_thread(string receiver_ip, in_port_t start_port, int nr_streams, co
         {
             throw std::system_error(errno, std::system_category(), FILELINE);
         }
+        result = setsockopt(sockets[i], SOL_SOCKET, SO_RCVBUF, (const char *)&bufsz, sizeof(bufsz));
+        if (result == -1)
+        {
+            throw std::system_error(errno, std::system_category(), FILELINE);
+        }
+
+        bufsz = 0;
+        optlen = sizeof(bufsz);
+        result = getsockopt(sockets[i], SOL_SOCKET, SO_RCVBUF, (char *)&bufsz, &optlen);
+        if (result == -1)
+        {
+            throw std::system_error(errno, std::system_category(), FILELINE);
+        }
+        //logdebug << "Got rmem buffer size: " << bufsz << '\n';
+
         set_nonblocking(sockets[i]);
         raddr.sin_port = htons(start_port + i);
         result = bind(sockets[i], (sockaddr *)&raddr, sizeof(raddr));
@@ -181,7 +198,7 @@ int main(int argc, char *argv[])
         {
             cout << "Second " << seconds << ": nr recv pkts " << (double)total_pkts << ", nr bytes "
                  << (double)total_bytes
-                 << ", pkts/s " << ((double)total_pkts)/seconds << ", bits/s " << ((double)total_bytes*8/seconds)
+                 << ", pkts/s " << ((double)total_pkts)/seconds << ", (goodput) bits/s " << ((double)total_bytes*8/seconds)
                  <<'\n';
         }
 

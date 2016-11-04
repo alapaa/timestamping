@@ -28,6 +28,8 @@ int sender_thread(string receiver_ip, in_port_t start_port, int nr_streams, cons
     char buf[PKT_PAYLOAD];
     int result;
     int tmp;
+    int bufsz = 1000000;
+    socklen_t optlen;
 
     vector<int> sockets(nr_streams);
     sockaddr_storage receiver_addr;
@@ -41,6 +43,19 @@ int sender_thread(string receiver_ip, in_port_t start_port, int nr_streams, cons
     {
         sockets[i] = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
         if (sockets[i] == -1)
+        {
+            throw std::system_error(errno, std::system_category(), FILELINE);
+        }
+        result = setsockopt(sockets[i], SOL_SOCKET, SO_SNDBUF, (const char *)&bufsz, sizeof(bufsz));
+        if (result == -1)
+        {
+            throw std::system_error(errno, std::system_category(), FILELINE);
+        }
+
+        bufsz = 0;
+        optlen = sizeof(bufsz);
+        result = getsockopt(sockets[i], SOL_SOCKET, SO_SNDBUF, (char *)&bufsz, &optlen);
+        if (result == -1)
         {
             throw std::system_error(errno, std::system_category(), FILELINE);
         }
@@ -126,7 +141,7 @@ int main(int argc, char *argv[])
         {
             cout << "Second " << seconds << ": nr pkts " << (double)total_pkts << ", nr bytes "
                  << (double)total_bytes
-                 << ", pkts/sec " << ((double)total_pkts)/seconds << ", bits/s " << ((double)total_bytes*8/seconds)
+                 << ", pkts/sec " << ((double)total_pkts)/seconds << ", (goodput) bits/s " << ((double)total_bytes*8/seconds)
                  << '\n';
         }
 
