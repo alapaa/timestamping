@@ -68,7 +68,7 @@ int receiver_thread(string receiver_ip, in_port_t start_port, int nr_streams, co
         {
             throw std::system_error(errno, std::system_category(), FILELINE);
         }
-        //logdebug << "Got rmem buffer size: " << bufsz << '\n';
+        if (worker_nr == 0 && i == 0) logdebug << "Got rmem buffer size: " << bufsz << '\n';
 
         set_nonblocking(sockets[i]);
         raddr.sin_port = htons(start_port + i);
@@ -92,8 +92,6 @@ int receiver_thread(string receiver_ip, in_port_t start_port, int nr_streams, co
             throw std::system_error(errno, std::system_category(), FILELINE);
         }
     }
-
-    cout << "Added " << nr_streams << " sockets to epoll.\n";
 
     for (;;)
     {
@@ -185,22 +183,22 @@ int main(int argc, char *argv[])
     }
 
     int seconds = 0;
+    const int INTERVAL = 10;
     for (;;)
     {
-        sleep(1);
-        seconds++;
+        total_bytes = 0;
+        total_pkts = 0;
+        sleep(INTERVAL);
+        seconds += INTERVAL;
         for (int i = 0; i < nr_workers; i++)
         {
             total_bytes += (byte_count+i)->exchange(0);
             total_pkts += (pkt_count+i)->exchange(0);
         }
-        if (seconds % 10 == 0)
-        {
-            cout << "Second " << seconds << ": nr recv pkts " << (double)total_pkts << ", nr bytes "
-                 << (double)total_bytes
-                 << ", pkts/s " << ((double)total_pkts)/seconds << ", (goodput) bits/s " << ((double)total_bytes*8/seconds)
-                 <<'\n';
-        }
+        cout << "Second " << seconds << ": nr recv pkts " << (double)total_pkts << ", nr bytes "
+             << (double)total_bytes
+             << ", pkts/s " << ((double)total_pkts)/INTERVAL << ", (goodput) bits/s " << ((double)total_bytes*8/INTERVAL)
+             <<'\n';
 
     }
 
