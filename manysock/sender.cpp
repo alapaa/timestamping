@@ -5,6 +5,7 @@
 #include <system_error>
 #include <atomic>
 #include <cstdint>
+#include <cstring>
 #include <unistd.h>
 
 #include "util.h"
@@ -23,9 +24,9 @@ using namespace Netrounds;
 
 atomic<uint64_t> *byte_count;
 atomic<uint64_t> *pkt_count;
-atomic<uint64_t> *eagain_count;
+//atomic<uint64_t> *eagain_count;
 
-int sender_thread(string receiver_ip, in_port_t start_port, int nr_streams, const int worker_nr, int bufsz)
+int sender_thread(string receiver_ip, in_port_t start_port, int nr_streams, const int worker_nr, int bufsz, int sleeplen)
 {
     int sent_bytes;
     const size_t PKT_PAYLOAD = 32;
@@ -72,24 +73,43 @@ int sender_thread(string receiver_ip, in_port_t start_port, int nr_streams, cons
         if (worker_nr == 0 && i == 0) logdebug << "Got buffer size " << bufsz << '\n';
     }
 
+    // Prepare for sendmmsg
+    const size_t NR_MSGS = 20;
+    struct mmsghdr msg[NR_MSGS];
+    struct iovec msg1;
+    memset(&msg1, 0, sizeof(msg1));
+    msg1.iov_base = buf;
+    msg1.iov_len = PKT_PAYLOAD;
+
+    memset(msg, 0, sizeof(msg));
+    for (int i = 0; i < NR_MSGS; i++)
+    {
+        msg[i].msg_hdr.msg_iov = &msg1;
+        msg[i].msg_hdr.msg_iovlen = 1;
+    }
     // The send loop.
     for (;;)
     {
+        usleep(sleeplen);
         for (int i = 0; i < nr_streams; i++)
         {
-            sent_bytes = send(sockets[i], buf, PKT_PAYLOAD, 0);
-            if (sent_bytes == -1)
+            sent_bytes = 0;
+            result = sendmmsg(sockets[i], msg, NR_MSGS, 0);
+            if (result == -1)
             {
-                if (errno == EAGAIN || errno == EWOULDBLOCK)
-                {
-                    (*(eagain_count+worker_nr))++;
-                    //loginfo << "---Sender dropping packet\n";
-                    continue;
-                }
                 throw std::system_error(errno, std::system_category(), FILELINE);
             }
+            else
+            {
+                //logdebug << "sendmmsg sent pkts: " << result << '\n';
+                for (int j = 0; j < result; j++)
+                {
+                    sent_bytes += msg[j].msg_len;
+                }
+            }
+
             *(byte_count+worker_nr) += sent_bytes;
-            (*(pkt_count+worker_nr))++;
+            (*(pkt_count+worker_nr))+= result;
         }
     }
 
@@ -112,15 +132,16 @@ int main(int argc, char *argv[])
     int nr_streams;
     int nr_workers;
     int bufsz;
+    int sleeplen;
     vector<thread> threads;
 
     uint64_t total_bytes = 0;
     uint64_t total_pkts = 0;
     uint64_t total_eagain = 0;
 
-    if (argc != 6)
+    if (argc != 7)
     {
-        cout << "Usage: sender <dest ip> <dest start of port range> <nr streams> <nr worker threads> <wmem_sz [kB]>\n";
+        cout << "Usage: sender <dest ip> <dest start of port range> <nr streams> <nr worker threads> <wmem_sz [kB]> <sleeplen us>\n";
     }
 
     INIT_LOGGING("/tmp/manysocklog.txt", LOG_DEBUG);
@@ -129,13 +150,14 @@ int main(int argc, char *argv[])
     nr_streams = stoi(argv[3]);
     nr_workers = stoi(argv[4]);
     bufsz = stoi(argv[5]);
+    sleeplen = stoi(argv[6]);
     int streams_per_worker = nr_streams / nr_workers;
 
     assert(streams_per_worker > 0);
 
     pkt_count = new atomic<uint64_t>[nr_workers];
     byte_count = new atomic<uint64_t>[nr_workers];
-    eagain_count = new atomic<uint64_t>[nr_workers];
+    //eagain_count = new atomic<uint64_t>[nr_workers];
 
     cout << "Starting. Using " << nr_workers << " worker threads and " << nr_streams << " streams.\n";
 
@@ -146,7 +168,8 @@ int main(int argc, char *argv[])
                                  start_port + i*streams_per_worker,
                                  streams_per_worker,
                                  i,
-                                 bufsz*1024));
+                                 bufsz*1024,
+                                 sleeplen));
     }
 
     int seconds = 0;
@@ -158,14 +181,14 @@ int main(int argc, char *argv[])
         {
             total_bytes += (byte_count+i)->exchange(0);
             total_pkts += (pkt_count+i)->exchange(0);
-            total_eagain += (eagain_count+i)->exchange(0);
+            //total_eagain += (eagain_count+i)->exchange(0);
         }
         if (seconds % 10 == 0)
         {
             cout << "Second " << seconds << ": nr pkts " << (double)total_pkts << ", nr bytes "
                  << (double)total_bytes
                  << ", pkts/sec " << ((double)total_pkts)/seconds << ", (goodput) bits/s " << ((double)total_bytes*8/seconds)
-                 << ", drop_count " << total_eagain
+                //<< ", drop_count " << total_eagain
                  << '\n';
         }
 
@@ -173,7 +196,7 @@ int main(int argc, char *argv[])
 
     delete[] pkt_count;
     delete[] byte_count;
-    delete[] eagain_count;
+    //delete[] eagain_count;
 
     return 0;
 }
