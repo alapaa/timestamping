@@ -142,6 +142,7 @@ int main(int argc, char *argv[])
     if (argc != 7)
     {
         cout << "Usage: sender <dest ip> <dest start of port range> <nr streams> <nr worker threads> <wmem_sz [kB]> <sleeplen us>\n";
+        exit(1);
     }
 
     INIT_LOGGING("/tmp/manysocklog.txt", LOG_DEBUG);
@@ -173,6 +174,8 @@ int main(int argc, char *argv[])
     }
 
     int seconds = 0;
+    long int sndbuf_errors = 0;
+    long int sndbuf_prev_errors = 0;
     for (;;)
     {
         sleep(1);
@@ -185,11 +188,14 @@ int main(int argc, char *argv[])
         }
         if (seconds % 10 == 0)
         {
-            cout << "Second " << seconds << ": nr pkts " << (double)total_pkts << ", nr bytes "
+            loginfo << "Second " << seconds << ": nr pkts " << (double)total_pkts << ", nr bytes "
                  << (double)total_bytes
                  << ", pkts/sec " << ((double)total_pkts)/seconds << ", (goodput) bits/s " << ((double)total_bytes*8/seconds)
                 //<< ", drop_count " << total_eagain
                  << '\n';
+            sndbuf_errors = stol(exec("/bin/netstat -s | grep -i sndbuf | cut -d\':\' -f2"));
+            loginfo  << "Nr of netstat sndbuf errors: " << sndbuf_errors - sndbuf_prev_errors << '\n';
+            sndbuf_prev_errors = sndbuf_errors;
         }
 
     }

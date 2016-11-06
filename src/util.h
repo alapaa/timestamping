@@ -10,6 +10,7 @@
 #define FILELINE string(__FILE__) + string(":") + string(to_string(__LINE__))
 // #define FILELINE string()
 
+std::string exec(const char* cmd);
 void check_equal_addresses(sockaddr_storage *ss1, sockaddr_storage *ss2);
 void do_bind(int sock, sockaddr_storage *ss);
 void set_nonblocking(int sock);
