@@ -8,6 +8,8 @@
 #include <cstring>
 #include <unistd.h>
 
+#include <sys/epoll.h>
+
 #include "util.h"
 #include "logging.h"
 
@@ -41,7 +43,10 @@ int sender_thread(string receiver_ip, in_port_t start_port, int nr_streams, cons
 
     sockaddr_in raddr = *reinterpret_cast<sockaddr_in *>(&receiver_addr);
 
-    // cout << "Worker " << worker_nr << " starting on CPU " << sched_getcpu() << '\n';
+    int nfds;
+    struct epoll_event ev;
+    struct epoll_event events[nr_streams];
+    int epollfd;
 
     for (int i = 0; i < nr_streams; i++)
     {
@@ -73,6 +78,24 @@ int sender_thread(string receiver_ip, in_port_t start_port, int nr_streams, cons
         if (worker_nr == 0 && i == 0) logdebug << "Got buffer size " << bufsz << '\n';
     }
 
+    // Prepare for using epoll.
+    epollfd = epoll_create1(0);
+    if (epollfd == -1)
+    {
+        throw std::system_error(errno, std::system_category(), FILELINE);
+    }
+
+    memset(&ev, 0, sizeof(ev));
+    for (int i = 0; i < nr_streams; i++)
+    {
+        ev.events = EPOLLOUT | EPOLLET;
+        ev.data.fd = sockets[i];
+        if (epoll_ctl(epollfd, EPOLL_CTL_ADD, sockets[i], &ev) == -1)
+        {
+            throw std::system_error(errno, std::system_category(), FILELINE);
+        }
+    }
+
     // Prepare for sendmmsg
     const size_t NR_MSGS = 20;
     struct mmsghdr msg[NR_MSGS];
@@ -90,11 +113,16 @@ int sender_thread(string receiver_ip, in_port_t start_port, int nr_streams, cons
     // The send loop.
     for (;;)
     {
-        usleep(sleeplen);
-        for (int i = 0; i < nr_streams; i++)
+        //usleep(sleeplen);
+        nfds = epoll_pwait(epollfd, events, nr_streams, -1, nullptr);
+        if (nfds == -1)
+        {
+            throw std::system_error(errno, std::system_category(), FILELINE);
+        }
+        for (int i = 0; i < nfds; i++)
         {
             sent_bytes = 0;
-            result = sendmmsg(sockets[i], msg, NR_MSGS, 0);
+            result = sendmmsg(events[i].data.fd, msg, NR_MSGS, 0);
             if (result == -1)
             {
                 throw std::system_error(errno, std::system_category(), FILELINE);
