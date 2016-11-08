@@ -8,6 +8,8 @@
 
 namespace Netrounds
 {
+
+const size_t HDR_SZ = 18+20+8; // TODO: IPv4 hardcoded
 enum PacketType
 {
     FROM_SENDER,

@@ -33,6 +33,9 @@ atomic<uint64_t> *byte_count;
 atomic<uint64_t> *pkt_count;
 //atomic<uint64_t> *eagain_count;
 
+const size_t PKT_PAYLOAD = 32;
+const size_t FRAME_SZ = HDR_SZ + PKT_PAYLOAD;
+const double TP_OVER_GP = (double)FRAME_SZ/PKT_PAYLOAD;
 
 struct bucket_data
 {
@@ -78,9 +81,6 @@ void replenish_buckets(vector<bucket_data>& bucket, const timespec& prevtime, co
 int sender_thread(string receiver_ip, in_port_t start_port, int nr_streams, const int worker_nr, int bufsz, double rate)
 {
     int sent_bytes;
-    const size_t PKT_PAYLOAD = 32;
-    const size_t HDR_SZ = 18+20+8; // TODO: IPv4 hardcoded
-    const size_t FRAME_SZ = HDR_SZ + PKT_PAYLOAD;
     char buf[PKT_PAYLOAD];
     int result;
     int tmp;
@@ -314,7 +314,7 @@ int main(int argc, char *argv[])
 
         loginfo << "Second " << seconds << ": nr pkts " << (double)total_pkts << ", nr bytes "
                 << (double)total_bytes
-                << ", pkts/sec " << ((double)total_pkts)/INTERVAL_LENGTH << ", (goodput) bits/s " << ((double)total_bytes*8/INTERVAL_LENGTH)
+                << ", pkts/sec " << ((double)total_pkts)/INTERVAL_LENGTH << ", bits/s " << ((double)total_bytes*8*TP_OVER_GP/INTERVAL_LENGTH)
             //<< ", drop_count " << total_eagain
                 << '\n';
         total_bytes = 0;

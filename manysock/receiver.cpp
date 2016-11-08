@@ -10,6 +10,7 @@
 
 #include <sys/epoll.h>
 
+#include "packet.h"
 #include "util.h"
 #include "logging.h"
 
@@ -24,12 +25,15 @@ using std::to_string;
 
 using namespace Netrounds;
 
+const size_t PKT_PAYLOAD = 32;
+const size_t FRAME_SZ = HDR_SZ + PKT_PAYLOAD;
+const double TP_OVER_GP = (double)FRAME_SZ/PKT_PAYLOAD;
+
 atomic<uint64_t> *byte_count;
 atomic<uint64_t> *pkt_count;
 
 int receiver_thread(string receiver_ip, in_port_t start_port, int nr_streams, const int worker_nr)
 {
-    const size_t PKT_PAYLOAD = 32;
     char buf[PKT_PAYLOAD];
     int result;
     int tmp;
@@ -202,7 +206,7 @@ int main(int argc, char *argv[])
         }
         loginfo << "Second " << seconds << ": nr recv pkts " << (double)total_pkts << ", nr bytes "
                 << (double)total_bytes
-                << ", pkts/s " << ((double)total_pkts)/INTERVAL << ", (goodput) bits/s " << ((double)total_bytes*8/INTERVAL)
+                << ", pkts/s " << ((double)total_pkts)/INTERVAL << ", bits/s " << ((double)total_bytes*8*TP_OVER_GP/INTERVAL)
                 <<'\n';
 
         rcvbuf_errors = stol(exec("/bin/netstat -s | grep -i rcvbuf | cut -d\':\' -f2"));
