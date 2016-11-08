@@ -161,7 +161,7 @@ int sender_thread(string receiver_ip, in_port_t start_port, int nr_streams, cons
     for (auto& buck : bucket)
     {
         buck.r = rate * 1024 * 1024 / 8;
-        buck.b = buck.r;
+        buck.b = buck.r/10;
         buck.n_tokens = 0;
         //cout << buck.r << ' '<< buck.b << ' ' << buck.n_tokens << '\n';
     }
@@ -204,7 +204,7 @@ int sender_thread(string receiver_ip, in_port_t start_port, int nr_streams, cons
                 bucket[i].in_epoll = false;
             }
         }
-        nfds = epoll_pwait(epollfd, events, nr_streams, 1000, nullptr);
+        nfds = epoll_pwait(epollfd, events, nr_streams, 100, nullptr);
         if (nfds == -1)
         {
             throw std::system_error(errno, std::system_category(), FILELINE);
