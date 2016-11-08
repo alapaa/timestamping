@@ -36,9 +36,9 @@ atomic<uint64_t> *pkt_count;
 
 struct bucket_data
 {
-    int b; // Bucket size in bytes.
-    int r; // Bucket rate, bytes/s.
-    int n_tokens; // Current nr of tokens in bucket, in bytes.
+    double b; // Bucket size in bytes.
+    double r; // Bucket rate, bytes/s.
+    double n_tokens; // Current nr of tokens in bucket, in bytes.
     bool in_epoll;
 };
 
@@ -46,14 +46,15 @@ void replenish_buckets(vector<bucket_data>& bucket, const timespec& prevtime, co
 {
     timespec tdiff = subtract_ts(currtime, prevtime);
     double tdiff_dbl = tdiff.tv_sec + tdiff.tv_nsec/1E9;
-    //cout << "tdiff" << tdiff_dbl << '\n';
+    //cout << "tdiff " << tdiff_dbl << '\n';
     for (auto &buck: bucket)
     {
-        //cout << "Adding " << buck.r * tdiff_dbl << "tokens\n";
+        //cout << "Adding " << buck.r * tdiff_dbl << " tokens\n";
         buck.n_tokens += buck.r * tdiff_dbl;
         //cout << "n_tokens after replenish: " << buck.n_tokens << '\n';
         buck.n_tokens = min(buck.n_tokens, buck.b);
         //cout << "after cap: " << buck.n_tokens << '\n';
+        //cout << buck.n_tokens / buck.b * 100 << "% ";
     }
 }
 
@@ -142,7 +143,7 @@ int sender_thread(string receiver_ip, in_port_t start_port, int nr_streams, cons
     memset(&ev, 0, sizeof(ev));
 
     // Prepare for sendmmsg
-    const size_t NR_MSGS = 20;
+    const size_t NR_MSGS = 5;
     struct mmsghdr msg[NR_MSGS];
     struct iovec msg1;
     memset(&msg1, 0, sizeof(msg1));
@@ -161,9 +162,11 @@ int sender_thread(string receiver_ip, in_port_t start_port, int nr_streams, cons
     {
         buck.r = rate * 1024 * 1024 / 8;
         buck.b = buck.r;
-        buck.n_tokens = buck.b/2;
+        buck.n_tokens = 0;
         //cout << buck.r << ' '<< buck.b << ' ' << buck.n_tokens << '\n';
     }
+    loginfo << "Token bucket. Using rate " << rate << " Mbit/s, bucket size " << bucket[0].b
+            << " bytes, initial # of tokens " << bucket[0].n_tokens << '\n';
     //cout << "Initialized bucket 0 to " << bucket[0].r << ' ' << bucket[0].b << ' ' << bucket[0].n_tokens << '\n';
 
     // Initialize counters
@@ -184,6 +187,7 @@ int sender_thread(string receiver_ip, in_port_t start_port, int nr_streams, cons
             ev.data.fd = sockets[i];
             if (bucket[i].n_tokens >= FRAME_SZ*NR_MSGS && bucket[i].in_epoll == false)
             {
+                //logdebug << "tokens " << bucket[i].n_tokens << " -------Adding stream to epoll\n";
                 if (epoll_ctl(epollfd, EPOLL_CTL_ADD, sockets[i], &ev) == -1)
                 {
                     throw std::system_error(errno, std::system_category(), FILELINE);
@@ -192,6 +196,7 @@ int sender_thread(string receiver_ip, in_port_t start_port, int nr_streams, cons
             }
             else if (bucket[i].n_tokens < FRAME_SZ*NR_MSGS && bucket[i].in_epoll == true)
             {
+                //logdebug << "tokens " << bucket[i].n_tokens << " ---------- removing stream from epoll\n";
                 if (epoll_ctl(epollfd, EPOLL_CTL_DEL, sockets[i], nullptr) == -1)
                 {
                     throw std::system_error(errno, std::system_category(), FILELINE);
@@ -226,7 +231,7 @@ int sender_thread(string receiver_ip, in_port_t start_port, int nr_streams, cons
                 bucket[sid].n_tokens -= (sent_bytes + result * HDR_SZ);
 
             }
-
+            //cout << ".\n";
             *(byte_count+worker_nr) += sent_bytes;
             (*(pkt_count+worker_nr))+= result;
         }
