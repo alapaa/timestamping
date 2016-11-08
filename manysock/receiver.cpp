@@ -187,6 +187,8 @@ int main(int argc, char *argv[])
 
     int seconds = 0;
     const int INTERVAL = 10;
+    long int rcvbuf_errors = 0;
+    long int rcvbuf_prev_errors = 0;
     for (;;)
     {
         total_bytes = 0;
@@ -198,11 +200,14 @@ int main(int argc, char *argv[])
             total_bytes += (byte_count+i)->exchange(0);
             total_pkts += (pkt_count+i)->exchange(0);
         }
-        cout << "Second " << seconds << ": nr recv pkts " << (double)total_pkts << ", nr bytes "
-             << (double)total_bytes
-             << ", pkts/s " << ((double)total_pkts)/INTERVAL << ", (goodput) bits/s " << ((double)total_bytes*8/INTERVAL)
-             <<'\n';
+        loginfo << "Second " << seconds << ": nr recv pkts " << (double)total_pkts << ", nr bytes "
+                << (double)total_bytes
+                << ", pkts/s " << ((double)total_pkts)/INTERVAL << ", (goodput) bits/s " << ((double)total_bytes*8/INTERVAL)
+                <<'\n';
 
+        rcvbuf_errors = stol(exec("/bin/netstat -s | grep -i rcvbuf | cut -d\':\' -f2"));
+        loginfo  << "Nr of netstat rcvbuf errors: " << rcvbuf_errors - rcvbuf_prev_errors << '\n';
+        rcvbuf_prev_errors = rcvbuf_errors;
     }
 
     return 0;
