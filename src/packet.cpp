@@ -129,9 +129,14 @@ shared_ptr<SenderPacket> deserialize_packet(char *data, size_t datalen)
 
 tuple<shared_ptr<char>, size_t> serialize_reflector_packet(shared_ptr<ReflectorPacket>& pkt)
 {
-    static_assert(sizeof(timespec) == 4*sizeof(uint32_t), "ouch1");
-    static_assert(sizeof(timespec::tv_sec) == 2*sizeof(uint32_t), "ouch2");
-    static_assert(sizeof(timespec::tv_nsec) == 2*sizeof(uint32_t), "ouch3");
+    #if __x86_64__
+    const int TS_SIZE = 2;
+    #else
+    const int TS_SIZE = 1;
+    #endif
+    static_assert(sizeof(timespec) == 2*TS_SIZE*sizeof(uint32_t), "ouch1");
+    static_assert(sizeof(timespec::tv_sec) == TS_SIZE*sizeof(uint32_t), "ouch2");
+    static_assert(sizeof(timespec::tv_nsec) == TS_SIZE*sizeof(uint32_t), "ouch3");
     size_t BUFLEN = 1472;
     pkt->type = serialize(pkt->type);
     pkt->sender_seq = htonl(pkt->sender_seq);

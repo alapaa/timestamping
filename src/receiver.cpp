@@ -9,7 +9,7 @@
 #include <unistd.h>
 #include <netinet/in.h>
 #include <linux/net_tstamp.h>
-#include <bsd/string.h>
+#include <bsd/string.h> # // strlcpy: apt-get install libbsd-dev on *buntu and Debian.
 
 #include "logging.h"
 #include "packet.h"

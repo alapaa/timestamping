@@ -41,8 +41,8 @@ TESTS = test_util
 
 # All Google Test headers.  Usually you shouldn't change this
 # definition.
-GTEST_HEADERS = $(GTEST_DIR)/include/gtest/*.h \
-                $(GTEST_DIR)/include/gtest/internal/*.h
+GTEST_HEADERS = $(wildcard $(GTEST_DIR)/include/gtest/*.h) \
+                $(wildcard $(GTEST_DIR)/include/gtest/internal/*.h)
 
 default: all
 all: $(SENDER) $(RECEIVER) $(TESTS)
@@ -88,7 +88,7 @@ clean:
 
 # Usually you shouldn't tweak such internal variables, indicated by a
 # trailing _.
-GTEST_SRCS_ = $(GTEST_DIR)/src/*.cc $(GTEST_DIR)/src/*.h $(GTEST_HEADERS)
+GTEST_SRCS_ =  $(wildcard $(GTEST_DIR)/src/*.cc) $(wildcard $(GTEST_DIR)/src/*.h) $(GTEST_HEADERS)
 
 # For simplicity and to avoid depending on Google Test's
 # implementation details, the dependencies specified below are

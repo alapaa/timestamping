@@ -3,7 +3,7 @@
 
 #include <iostream>
 #include <fstream>
-#include <exception>
+#include <stdexcept>
 #include <string>
 
 // TODO: Make this into a class to use one log object per thread,

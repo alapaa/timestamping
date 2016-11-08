@@ -15,7 +15,7 @@ enum PacketType
     FROM_REFLECTOR_ONLY_TIMESTAMPS // Used for packets that are 'unsolicited', i.e. not a reflected pkt.
 };
 
-typedef uint32_t timestamp_t;
+typedef int32_t timestamp_t;
 
 struct SenderPacket
 {
