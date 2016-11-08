@@ -93,6 +93,9 @@ int receiver_thread(string receiver_ip, in_port_t start_port, int nr_streams, co
         }
     }
 
+    *(byte_count+worker_nr) = 0;
+    (*(pkt_count+worker_nr)) = 0;
+
     for (;;)
     {
         nfds = epoll_pwait(epollfd, events, nr_streams, -1, nullptr);

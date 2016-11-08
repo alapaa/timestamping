@@ -166,6 +166,11 @@ int sender_thread(string receiver_ip, in_port_t start_port, int nr_streams, cons
     }
     //cout << "Initialized bucket 0 to " << bucket[0].r << ' ' << bucket[0].b << ' ' << bucket[0].n_tokens << '\n';
 
+    // Initialize counters
+
+    *(byte_count+worker_nr) = 0;
+    (*(pkt_count+worker_nr)) = 0;
+
     // The send loop.
     clock_gettime(CLOCK_MONOTONIC, &currtime);
     for (;;)
@@ -309,8 +314,8 @@ int main(int argc, char *argv[])
                 << '\n';
         total_bytes = 0;
         total_pkts = 0;
-        sndbuf_errors = stol(exec("/bin/netstat -s | grep -i sndbuf | cut -d\':\' -f2"));
-        loginfo  << "Nr of netstat sndbuf errors: " << sndbuf_errors - sndbuf_prev_errors << '\n';
+        //sndbuf_errors = stol(exec("/bin/netstat -s | grep -i sndbuf | cut -d\':\' -f2"));
+        //loginfo  << "Nr of netstat sndbuf errors: " << sndbuf_errors - sndbuf_prev_errors << '\n';
         sndbuf_prev_errors = sndbuf_errors;
 
 
