@@ -314,8 +314,8 @@ int main(int argc, char *argv[])
                 << '\n';
         total_bytes = 0;
         total_pkts = 0;
-        //sndbuf_errors = stol(exec("/bin/netstat -s | grep -i sndbuf | cut -d\':\' -f2"));
-        //loginfo  << "Nr of netstat sndbuf errors: " << sndbuf_errors - sndbuf_prev_errors << '\n';
+        sndbuf_errors = stol(exec("/bin/netstat -s | grep -i sndbuf | cut -d\':\' -f2"));
+        loginfo  << "Nr of netstat sndbuf errors: " << sndbuf_errors - sndbuf_prev_errors << '\n';
         sndbuf_prev_errors = sndbuf_errors;
 
 
