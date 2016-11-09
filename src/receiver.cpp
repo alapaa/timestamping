@@ -9,7 +9,7 @@
 #include <unistd.h>
 #include <netinet/in.h>
 #include <linux/net_tstamp.h>
-#include <bsd/string.h> # // strlcpy: apt-get install libbsd-dev on *buntu and Debian.
+#include <bsd/string.h> // strlcpy: apt-get install libbsd-dev on *buntu and Debian.
 
 #include "logging.h"
 #include "packet.h"
@@ -23,7 +23,7 @@ using std::shared_ptr;
 
 using namespace Netrounds;
 
-void receive_loop(string address, in_port_t listen_port, int domain, string iface_name)
+void receive_loop(string address, in_port_t listen_port, int domain, string iface_name, bool use_sw_tstamp)
 {
     int sock;
     const time_t SLEEP_TIME = 20;
@@ -84,7 +84,7 @@ void receive_loop(string address, in_port_t listen_port, int domain, string ifac
             t2_prev = t2;
             logdebug << "Assigned t2_prev ";
             logdebug << t2_prev << '\n';
-            tie(data, datalen, ss, t2) = recvpacket(sock, 0);
+            tie(data, datalen, ss, t2) = recvpacket(sock, 0, use_sw_tstamp);
             logdebug << "Got new T2 " << t2 << '\n';
             if (datalen == 0)
             {
@@ -118,7 +118,7 @@ void receive_loop(string address, in_port_t listen_port, int domain, string ifac
             sendpacket(&ss, sock, data.get(), datalen);
             logdebug << "Sent reply, now get HW send timestamp...\n";
             wait_for_errqueue_data(sock);
-            tie(data, datalen, ss, t3_prev) = receive_send_timestamp(sock);
+            tie(data, datalen, ss, t3_prev) = receive_send_timestamp(sock, use_sw_tstamp);
             logdebug << "Got new T3 prev ";
             logdebug << t3_prev << '\n';
             if (!check_seqnr(data, datalen, pkt->sender_seq))
@@ -137,12 +137,13 @@ int main(int argc, char *argv[])
     int domain;
     int ipver;
     string iface_name;
+    bool use_sw_tstamp = false;
 
     try
     {
-        if (argc != 5)
+        if (argc != 6)
         {
-            throw std::runtime_error("Usage: receiver <bind ip (can be 0.0.0.0)> <bind port> <ip ver (4 or 6)> <iface>");
+            throw std::runtime_error("Usage: receiver <bind ip (can be 0.0.0.0)> <bind port> <ip ver (4 or 6)> <iface> <use_sw_tstamp>");
         }
         else
         {
@@ -151,9 +152,11 @@ int main(int argc, char *argv[])
             ipver = stoi(argv[3]);
             domain = ipver == 6 ? AF_INET6 : AF_INET;
             iface_name = string(argv[4]);
+            int tmp = stoi(argv[5]);
+            if (tmp) use_sw_tstamp = true;
         }
         INIT_LOGGING("/tmp/tslog.txt", LOG_DEBUG);
-        receive_loop(address, port, domain, iface_name);
+        receive_loop(address, port, domain, iface_name, use_sw_tstamp);
     }
     catch (std::exception &exc)
     {

@@ -171,8 +171,15 @@ int setup_socket(int domain, int type, int so_timestamping_flags)
         }
     }
 
-    /* request IP_PKTINFO for debugging purposes */
     int enabled = 1;
+    result = setsockopt(sock, SOL_SOCKET, SO_TIMESTAMPNS,
+                        &enabled, sizeof(enabled));
+    if (result == -1)
+    {
+        throw std::system_error(errno, std::system_category());
+    }
+    /* request IP_PKTINFO for debugging purposes */
+
     result = setsockopt(sock, SOL_IP, IP_PKTINFO, &enabled, sizeof(enabled));
     if (result == -1)
     {
@@ -226,7 +233,7 @@ void sendpacket(sockaddr_storage *ss, int sock, char *buf, size_t buflen)
     }
 }
 
-tuple<shared_ptr<char>, int, sockaddr_storage, timespec> recvpacket(int sock, int recvmsg_flags)
+tuple<shared_ptr<char>, int, sockaddr_storage, timespec> recvpacket(int sock, int recvmsg_flags, bool use_sw_tstamp)
 {
     const size_t MAX_LEN = 1600;
     shared_ptr<char> data(new char[MAX_LEN]); // TODO: Change to vector<char> or maybe shared_array
@@ -285,13 +292,13 @@ tuple<shared_ptr<char>, int, sockaddr_storage, timespec> recvpacket(int sock, in
         else
         {
             timespec hwts;
-            printpacket(&msg, len, sock, recvmsg_flags, 0, 0, &hwts);
+            printpacket(&msg, len, sock, recvmsg_flags, 0, 0, &hwts, use_sw_tstamp);
             return tuple<shared_ptr<char>, int, sockaddr_storage, timespec>(data, len, from_addr, hwts);
         }
     }
 }
 
-tuple<shared_ptr<char>, int, sockaddr_storage, timespec> receive_send_timestamp(int sock)
+tuple<shared_ptr<char>, int, sockaddr_storage, timespec> receive_send_timestamp(int sock, bool use_sw_tstamp)
 {
     //shared_ptr<char> data;
     //size_t datalen;
@@ -311,7 +318,7 @@ tuple<shared_ptr<char>, int, sockaddr_storage, timespec> receive_send_timestamp(
     //     logdebug << "word " << i << " of packet payload from MSG_ERRQUEUE: " << htonl(*(wp+i)) << '\n';
     // }
 
-    return recvpacket(sock, MSG_ERRQUEUE);
+    return recvpacket(sock, MSG_ERRQUEUE, use_sw_tstamp);
 }
 
 void create_sockaddr_storage(int domain, string address, in_port_t port, sockaddr_storage *ssp)

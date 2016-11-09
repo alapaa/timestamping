@@ -32,6 +32,7 @@ int main(int argc, char *argv[])
     int ipver = 0;
     string iface_name;
     double send_interval;
+    bool use_sw_tstamp = false;
 
     const size_t BUFLEN = 1472;
     char buf[BUFLEN];
@@ -59,9 +60,9 @@ int main(int argc, char *argv[])
     INIT_LOGGING("/tmp/tslog.txt", LOG_DEBUG);
     try
     {
-        if (argc != 7)
+        if (argc != 8)
         {
-            throw std::runtime_error("Usage: sender <ip addr> <port> <ip ver (4 or 6)> <nr of packets> <iface> <send interval [ms]>");
+            throw std::runtime_error("Usage: sender <ip addr> <port> <ip ver (4 or 6)> <nr of packets> <iface> <send interval [ms]> <use_sw_tstamp>");
         }
         else
         {
@@ -72,6 +73,12 @@ int main(int argc, char *argv[])
             nr_packets = stoi(argv[4]);
             iface_name = string(argv[5]);
             send_interval = stod(argv[6]);
+            int tmp = stoi(argv[7]);
+            if (tmp)
+            {
+                logwarning << "--------- USING FALLBACK SW TIMESTAMP\n";
+                use_sw_tstamp = true;
+            }
         }
 
         const long long int INTERVAL_NANOSEC = send_interval * 1000000;
@@ -93,8 +100,8 @@ int main(int argc, char *argv[])
             wait_for_errqueue_data(sock);
             t1_prev = t1;
             t4_prev = t4;
-            tie(data, datalen, ss, t1) = receive_send_timestamp(sock);
-            tie(data, datalen, ss, t4) = recvpacket(sock, 0);
+            tie(data, datalen, ss, t1) = receive_send_timestamp(sock, use_sw_tstamp);
+            tie(data, datalen, ss, t4) = recvpacket(sock, 0, use_sw_tstamp);
             if (!data)
             {
                 logdebug << "----------No data from sender at lap " << (send_counter - 1) << '\n';

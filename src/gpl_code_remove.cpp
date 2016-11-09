@@ -11,7 +11,7 @@
 #include "gpl_code_remove.h"
 
 // Disable printf:
-#define printf(fmt, ...) (0)
+//#define printf(fmt, ...) (0)
 
 using std::cout;
 
@@ -19,7 +19,7 @@ using std::cout;
 // TODO: Remove/remake printpacket, it is GPL and uses C-style printf.
 void printpacket(struct msghdr *msg, int res,
                  int sock, int recvmsg_flags,
-                 int siocgstamp, int siocgstampns, timespec *ts_result)
+                 int siocgstamp, int siocgstampns, timespec *ts_result, bool use_sw_tstamp)
 {
     struct sockaddr_in *from_addr = (struct sockaddr_in *)msg->msg_name;
     struct cmsghdr *cmsg;
@@ -58,6 +58,10 @@ void printpacket(struct msghdr *msg, int res,
                 printf("SO_TIMESTAMPNS %ld.%09ld",
                        (long)stamp->tv_sec,
                        (long)stamp->tv_nsec);
+                if (use_sw_tstamp)
+                {
+                    *ts_result = *stamp;
+                }
                 break;
             }
             case SO_TIMESTAMPING: {
@@ -73,7 +77,10 @@ void printpacket(struct msghdr *msg, int res,
                 printf("HW raw %ld.%09ld",
                        (long)stamp->tv_sec,
                        (long)stamp->tv_nsec);
-                *ts_result = *stamp;
+                if (!use_sw_tstamp)
+                {
+                    *ts_result = *stamp;
+                }
                 break;
             }
             default:

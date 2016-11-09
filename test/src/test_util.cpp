@@ -84,7 +84,7 @@ TEST_F(UtilTest, RecvPacket)
         throw std::system_error(errno, std::system_category());
     }
 
-    tie(data, datalen, ss, hwts) = recvpacket(sock2, 0);
+    tie(data, datalen, ss, hwts) = recvpacket(sock2, 0, false);
     //check_equal_addresses(&ss, &send_ss);
     string received_buf(data.get());
     EXPECT_EQ(received_buf, string(buf));
@@ -121,7 +121,7 @@ TEST_F(UtilTest, RecvPacketRealUdp)
     do_bind(sock2, &expected_sender_addr);
 
     sendpacket(domain, addr, listen_port, sock, buf, sizeof(buf));
-    tie(data, datalen, ss, hwts) = recvpacket(sock2, 0);
+    tie(data, datalen, ss, hwts) = recvpacket(sock2, 0, false);
 
     check_equal_addresses(&ss, &expected_sender_addr);
     string received_buf(data.get());

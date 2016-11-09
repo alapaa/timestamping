@@ -3,5 +3,5 @@
 
 void printpacket(struct msghdr *msg, int res,
                  int sock, int recvmsg_flags,
-                 int siocgstamp, int siocgstampns, timespec *ts_result);
+                 int siocgstamp, int siocgstampns, timespec *ts_result, bool use_sw_tstamp);
 #endif
