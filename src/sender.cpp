@@ -56,7 +56,7 @@ int main(int argc, char *argv[])
     timespec initial_time {0, 0};
     int result;
 
-    INIT_LOGGING("/tmp/tslog.txt", LOG_DEBUG);
+    INIT_LOGGING("/tmp/tslog.txt", LOG_INFO);
     try
     {
         if (argc != 7)

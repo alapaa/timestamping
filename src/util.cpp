@@ -153,6 +153,7 @@ int setup_socket(int domain, int type, int so_timestamping_flags)
     loginfo << "Checking SO_TIMESTAMPING flags... ";
     len = sizeof(val);
     result = getsockopt(sock, SOL_SOCKET, SO_TIMESTAMPING, &val, &len);
+    loginfo << "Got result " << result << '\n';
     if (result == -1)
     {
         throw std::system_error(errno, std::system_category());
@@ -170,23 +171,8 @@ int setup_socket(int domain, int type, int so_timestamping_flags)
         }
     }
 
-    logdebug << "As fallback, also setting sockopts for SW timestamping.\n";
-    int enabled = 1;
-    result = setsockopt(sock, SOL_SOCKET, SO_TIMESTAMP,
-                        &enabled, sizeof(enabled));
-    if (result == -1)
-    {
-        throw std::system_error(errno, std::system_category());
-    }
-
-    result = setsockopt(sock, SOL_SOCKET, SO_TIMESTAMPNS,
-                        &enabled, sizeof(enabled));
-    if (result == -1)
-    {
-        throw std::system_error(errno, std::system_category());
-    }
-
     /* request IP_PKTINFO for debugging purposes */
+    int enabled = 1;
     result = setsockopt(sock, SOL_IP, IP_PKTINFO, &enabled, sizeof(enabled));
     if (result == -1)
     {
