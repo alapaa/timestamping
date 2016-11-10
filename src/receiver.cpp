@@ -160,7 +160,7 @@ int main(int argc, char *argv[])
     }
     catch (std::exception &exc)
     {
-        logdebug << "Got exception: " << exc.what() << '\n';
+        std::cout << "Got exception: " << exc.what() << '\n';
         exit(1);
     }
 
