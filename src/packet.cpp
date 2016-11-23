@@ -60,9 +60,10 @@ string ts2string(const timespec& ts)
 {
     stringstream ss;
 
-    ss << std::fixed;
-    ss << std::setprecision(9);
-    ss  << "    " << (ts.tv_sec + (double)ts.tv_nsec/1000000000);
+    const size_t SZ = 100;
+    char buf[SZ];
+    snprintf(buf, SZ, "%ld.%09ld ", ts.tv_sec, ts.tv_nsec);
+    ss << "    " << buf;
 
     if (ts.tv_sec == 0)
     {

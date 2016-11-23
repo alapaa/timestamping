@@ -112,7 +112,7 @@ void printpacket(struct msghdr *msg, int res,
                 break;
             }
             case IP_PKTINFO: {
-                in_addr tmpaddr;
+                //in_addr tmpaddr;
                 struct in_pktinfo *pktinfo =
                     (struct in_pktinfo *)CMSG_DATA(cmsg);
                 printf("IP_PKTINFO interface index %u, ",
