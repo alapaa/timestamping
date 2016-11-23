@@ -161,7 +161,7 @@ int sender_thread(string receiver_ip, in_port_t start_port, int nr_streams, cons
     for (auto& buck : bucket)
     {
         buck.r = rate * 1024 * 1024 / 8;
-        buck.b = buck.r/10;
+        buck.b = buck.r;
         buck.n_tokens = 0;
         //cout << buck.r << ' '<< buck.b << ' ' << buck.n_tokens << '\n';
     }
@@ -284,7 +284,7 @@ int main(int argc, char *argv[])
     byte_count = new atomic<uint64_t>[nr_workers];
     //eagain_count = new atomic<uint64_t>[nr_workers];
 
-    cout << "Starting. Using " << nr_workers << " worker threads and " << nr_streams << " streams.\n";
+    cout << "Starting. Using " << nr_workers << " worker threads and " << streams_per_worker*nr_workers << " streams.\n";
 
     for (int i = 0; i < nr_workers; i++)
     {

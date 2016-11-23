@@ -178,7 +178,7 @@ int main(int argc, char *argv[])
     byte_count = new atomic<uint64_t>[nr_workers];
 
     INIT_LOGGING("/tmp/manysocklog.txt", LOG_DEBUG);
-    cout << "Starting. Using " << nr_workers << " worker threads and " << nr_streams << " streams.\n";
+    cout << "Starting. Using " << nr_workers << " worker threads and " << streams_per_worker*nr_workers << " streams.\n";
 
     for (int i = 0; i < nr_workers; i++)
     {
