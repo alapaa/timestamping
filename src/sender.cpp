@@ -57,7 +57,7 @@ int main(int argc, char *argv[])
     timespec initial_time {0, 0};
     int result;
 
-    INIT_LOGGING("/tmp/tslog.txt", LOG_DEBUG);
+    INIT_LOGGING("/tmp/tslog.txt", LOG_INFO);
     try
     {
         if (argc != 8)
@@ -116,10 +116,10 @@ int main(int argc, char *argv[])
             t2_prev = make_timespec(rp->t2_sec, rp->t2_nsec);
             t3_prev = make_timespec(rp->t3_sec, rp->t3_nsec);
 
-            logdebug << t1_prev << '\n';
-            logdebug << t2_prev << '\n';
-            logdebug << t3_prev << '\n';
-            logdebug << t4_prev << '\n';
+            loginfo << t1_prev << '\n';
+            loginfo << t2_prev << '\n';
+            loginfo << t3_prev << '\n';
+            loginfo << t4_prev << '\n';
 
             if (t1_prev != ZERO_TS && t4_prev != ZERO_TS &&
                 t2_prev != ZERO_TS && t3_prev != ZERO_TS)
@@ -144,7 +144,7 @@ int main(int argc, char *argv[])
                     loginfo << "Clock drift since start: ";
                     timespec drift = subtract_ts(clockdiff, initial_clock_diff);
                     timespec time_elapsed = subtract_ts(t1_prev, initial_time);
-                    loginfo << drift << '\n';
+                    loginfo << drift << "As double (rounded): " << ts2string_rounding(drift) << '\n';
                     loginfo << "Clock drift (sender<->receiver NIC) as ppm: " << 1E6 * (drift.tv_sec + drift.tv_nsec / 1E9) /
                         (time_elapsed.tv_sec + time_elapsed.tv_nsec / 1E9) << '\n';
                 }

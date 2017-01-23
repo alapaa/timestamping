@@ -56,6 +56,17 @@ bool operator!=(const timespec& t1, const timespec& t2)
     return (!(t1 == t2));
 }
 
+string ts2string_rounding(const timespec& ts)
+{
+    stringstream ss;
+
+    ss << std::fixed;
+    ss << std::setprecision(9);
+    ss  << "    " << (ts.tv_sec + (double)ts.tv_nsec/1000000000);
+
+    return ss.str();
+}
+
 string ts2string(const timespec& ts)
 {
     stringstream ss;
