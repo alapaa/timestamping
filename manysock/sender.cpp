@@ -18,6 +18,7 @@
 using std::thread;
 using std::vector;
 using std::map;
+using std::multimap;
 using std::make_pair;
 using std::cout;
 using std::system_error;
@@ -34,11 +35,11 @@ atomic<uint64_t> *byte_count;
 atomic<uint64_t> *pkt_count;
 //atomic<uint64_t> *eagain_count;
 
-const size_t PKT_PAYLOAD = 32;
+const size_t PKT_PAYLOAD = 1472;
 const size_t FRAME_SZ = HDR_SZ + PKT_PAYLOAD;
 const double TP_OVER_GP = (double)FRAME_SZ/PKT_PAYLOAD;
 const size_t NR_MSGS = 5;
-
+const int MEGABIT2BIT = 1048576;
 struct stream
 {
     int id;
@@ -75,8 +76,8 @@ int sender_thread(string receiver_ip, in_port_t start_port, int nr_streams, cons
     timespec currtime = {0, 0};
 
     stream s;
-    s.rate = rate;
-    s.packet_size = PKT_PAYLOAD;
+    s.rate = rate * MEGABIT2BIT; // Convert
+    s.packet_size = FRAME_SZ;
 
     std::map<int, stream> streams; // Maps from stream id to stream struct
 
@@ -114,6 +115,8 @@ int sender_thread(string receiver_ip, in_port_t start_port, int nr_streams, cons
         if (worker_nr == 0 && i == 0) logdebug << "Got buffer size " << bufsz << '\n';
     }
 
+    logdebug << "nr streams in map: " << streams.size() << '\n';
+
     // Prepare for sendmmsg
     struct mmsghdr msg[NR_MSGS];
     struct iovec msg1;
@@ -135,16 +138,19 @@ int sender_thread(string receiver_ip, in_port_t start_port, int nr_streams, cons
 
 
     // Set up send queue
-    map<timespec, stream> send_queue;
+    multimap<timespec, stream> send_queue;
     timespec next_send;
     clock_gettime(CLOCK_MONOTONIC, &currtime);
     for (auto s: streams)
     {
         double next_send_dbl = compute_next_send(s.second);
+        logdebug << "next_send_dbl: " << next_send_dbl << '\n';
         dbl2ts(next_send_dbl, next_send);
         next_send = add_ts(currtime, next_send);
         send_queue.insert(make_pair(next_send, s.second));
+        logdebug << "Stream rate: " << s.second.rate << '\n';
     }
+    logdebug << "Size of send queue " <<send_queue.size() << '\n';
 
     // The sendqueue-based send loop
     for (;;)
@@ -153,25 +159,35 @@ int sender_thread(string receiver_ip, in_port_t start_port, int nr_streams, cons
 
         double next_send_dbl = compute_next_send(it->second);
         dbl2ts(next_send_dbl, next_send);
+        //logdebug << "next_send_dbl: " << next_send_dbl << '\n';
         clock_gettime(CLOCK_MONOTONIC, &currtime);
-        next_send = add_ts(currtime, next_send);
+        next_send = add_ts(it->first, next_send);
         send_queue.insert(make_pair(next_send, it->second));
 
-        clock_gettime(CLOCK_MONOTONIC, &currtime); // TODO: Maybe good enough to reuse gettime from above, saving a
-                                                   // clock_gettime call?
         timespec tdiff = subtract_ts(it->first, currtime);
-        if (tdiff.tv_sec > 0 || tdiff.tv_nsec > MILLION)
+        //logdebug << "tdiff " << tdiff << '\n';
+        if (tdiff.tv_sec > 0 || tdiff.tv_sec == 0 && tdiff.tv_nsec > 1000)
         {
+            //logdebug << "Sleeping\n";
+            //clock_gettime(CLOCK_MONOTONIC, &currtime);
+            if (tdiff.tv_nsec > 100000) tdiff.tv_nsec -= 100000; // Shorten sleeep somewhat to compensate for send overhead
             result = nanosleep(&tdiff, nullptr);
+            //timespec oldtime = currtime; clock_gettime(CLOCK_MONOTONIC, &currtime);
+            //logdebug << "Actual sleep length: " << subtract_ts(currtime, oldtime) << '\n';
             if (result == -1)
             {
                 throw std::system_error(errno, std::system_category(), FILELINE);
             }
         }
+        else
+        {
+            //logdebug << "Send without sleep\n";
+        }
+        sent_bytes = 0;
         result = sendmmsg(it->second.sock, msg, NR_MSGS, 0);
         if (result == -1)
         {
-                throw std::system_error(errno, std::system_category(), FILELINE);
+            throw std::system_error(errno, std::system_category(), FILELINE);
         }
         else
         {
@@ -186,6 +202,7 @@ int sender_thread(string receiver_ip, in_port_t start_port, int nr_streams, cons
         // Prepare for next send
         send_queue.erase(it);
     }
+    logdebug << "Sent bytes: " << sent_bytes << " sent_pkts " << result << '\n';
 
     for (int i = 0; i < nr_streams; i++)
     {
@@ -269,11 +286,17 @@ int main(int argc, char *argv[])
                 << '\n';
         total_bytes = 0;
         total_pkts = 0;
-        sndbuf_errors = stol(exec("/bin/netstat -s | grep -i sndbuf | cut -d\':\' -f2"));
+        string output = exec("/bin/netstat -s | grep -i sndbuf | cut -d\':\' -f2");
+        if (output.size())
+        {
+            sndbuf_errors = stol(output);
+        }
+        else
+        {
+            sndbuf_errors = 0;
+        }
         loginfo  << "Nr of netstat sndbuf errors: " << sndbuf_errors - sndbuf_prev_errors << '\n';
         sndbuf_prev_errors = sndbuf_errors;
-
-
     }
 
     delete[] pkt_count;
