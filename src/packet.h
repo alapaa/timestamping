@@ -6,6 +6,8 @@
 
 #include <cstdint>
 
+bool operator<(const timespec& t1, const timespec& t2);
+
 namespace Netrounds
 {
 
@@ -50,6 +52,7 @@ bool operator==(const timespec& t1, const timespec& t2);
 bool operator!=(const timespec& t1, const timespec& t2);
 std::ostream& operator<<(std::ostream& os, const timespec& ts);
 std::string ts2string_rounding(const timespec& ts);
+timespec add_ts(const timespec& lhs, const timespec& rhs);
 timespec subtract_ts(const timespec& newer, const timespec& older);
 timespec make_timespec(timestamp_t tv_sec, timestamp_t tv_nsec);
 void prepare_packet(char* buf, size_t buflen, uint32_t seq);
@@ -57,6 +60,8 @@ std::shared_ptr<SenderPacket> deserialize_packet(char *data, size_t datalen);
 std::tuple<std::shared_ptr<char>, size_t> serialize_reflector_packet(std::shared_ptr<ReflectorPacket>& pkt);
 std::shared_ptr<ReflectorPacket> deserialize_reflector_packet(std::shared_ptr<char> data, int datalen);
 bool check_seqnr(std::shared_ptr<char> data, int datalen, uint32_t seqnr);
+void dbl2ts(double dbl, timespec& ts);
+
 };
 
 #endif

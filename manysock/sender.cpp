@@ -1,7 +1,7 @@
 #include <iostream>
 #include <thread>
 #include <vector>
-#include <unordered_map>
+#include <map>
 #include <cassert>
 #include <system_error>
 #include <atomic>
@@ -17,7 +17,8 @@
 
 using std::thread;
 using std::vector;
-using std::unordered_map;
+using std::map;
+using std::make_pair;
 using std::cout;
 using std::system_error;
 using std::atomic;
@@ -36,48 +37,27 @@ atomic<uint64_t> *pkt_count;
 const size_t PKT_PAYLOAD = 32;
 const size_t FRAME_SZ = HDR_SZ + PKT_PAYLOAD;
 const double TP_OVER_GP = (double)FRAME_SZ/PKT_PAYLOAD;
+const size_t NR_MSGS = 5;
 
-struct bucket_data
+struct stream
 {
-    double b; // Bucket size in bytes.
-    double r; // Bucket rate, bytes/s.
-    double n_tokens; // Current nr of tokens in bucket, in bytes.
-    bool in_epoll;
+    int id;
+    int sock;
+    double rate; // Unit [bits/s]
+    size_t packet_size;
 };
 
-void replenish_buckets(vector<bucket_data>& bucket, const timespec& prevtime, const timespec& currtime)
+const int MILLION = 1000000;
+
+double compute_next_send(stream s)
 {
-    timespec tdiff = subtract_ts(currtime, prevtime);
-    double tdiff_dbl = tdiff.tv_sec + tdiff.tv_nsec/1E9;
-    //cout << "tdiff " << tdiff_dbl << '\n';
-    for (auto &buck: bucket)
-    {
-        //cout << "Adding " << buck.r * tdiff_dbl << " tokens\n";
-        buck.n_tokens += buck.r * tdiff_dbl;
-        //cout << "n_tokens after replenish: " << buck.n_tokens << '\n';
-        buck.n_tokens = min(buck.n_tokens, buck.b);
-        //cout << "after cap: " << buck.n_tokens << '\n';
-        //cout << buck.n_tokens / buck.b * 100 << "% ";
-    }
+    return NR_MSGS*s.packet_size*8/s.rate;
 }
 
 /*
  *
- * Each sender thread uses a token bucket to control packet rate for each individual stream.
- *
- * From Wikipedia (r is rate in bytes/s):
- * The token bucket algorithm can be conceptually understood as follows:
- * - A token is added to the bucket every 1/r seconds.
- * - The bucket can hold at the most b tokens. If a token arrives when the bucket is full, it is discarded.
- * - When a packet (network layer PDU) of n bytes arrives, n tokens are removed from the bucket, and the packet is sent
- *   to the network.
- * - If fewer than n tokens are available, no tokens are removed from the bucket, and the packet is considered to be
- *   non-conformant.
- *
- * We drop non-conformant packets.
- *
+ * Implementation of sender worker using send queue instead of e.g. token bucket.
  */
-
 int sender_thread(string receiver_ip, in_port_t start_port, int nr_streams, const int worker_nr, int bufsz, double rate)
 {
     int sent_bytes;
@@ -92,24 +72,25 @@ int sender_thread(string receiver_ip, in_port_t start_port, int nr_streams, cons
 
     sockaddr_in raddr = *reinterpret_cast<sockaddr_in *>(&receiver_addr);
 
-    int nfds;
-    struct epoll_event ev;
-    struct epoll_event events[nr_streams];
-    int epollfd;
-
     timespec currtime = {0, 0};
-    timespec prevtime = {0, 0};
-    vector<bucket_data> bucket(nr_streams);
-    unordered_map<int, int> sock2stream;
+
+    stream s;
+    s.rate = rate;
+    s.packet_size = PKT_PAYLOAD;
+
+    std::map<int, stream> streams; // Maps from stream id to stream struct
 
     for (int i = 0; i < nr_streams; i++)
     {
         sockets[i] = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-        sock2stream.insert(std::make_pair(sockets[i], i));
         if (sockets[i] == -1)
         {
             throw std::system_error(errno, std::system_category(), FILELINE);
         }
+        s.id = i;
+        s.sock = sockets[i];
+        streams.insert(make_pair(i, s));
+
         raddr.sin_port = ntohs(start_port + i);
         result = connect(sockets[i], (sockaddr *)&raddr, sizeof(raddr));
         if (result == -1)
@@ -133,17 +114,7 @@ int sender_thread(string receiver_ip, in_port_t start_port, int nr_streams, cons
         if (worker_nr == 0 && i == 0) logdebug << "Got buffer size " << bufsz << '\n';
     }
 
-    // Prepare for using epoll.
-    epollfd = epoll_create1(0);
-    if (epollfd == -1)
-    {
-        throw std::system_error(errno, std::system_category(), FILELINE);
-    }
-
-    memset(&ev, 0, sizeof(ev));
-
     // Prepare for sendmmsg
-    const size_t NR_MSGS = 5;
     struct mmsghdr msg[NR_MSGS];
     struct iovec msg1;
     memset(&msg1, 0, sizeof(msg1));
@@ -157,84 +128,63 @@ int sender_thread(string receiver_ip, in_port_t start_port, int nr_streams, cons
         msg[i].msg_hdr.msg_iovlen = 1;
     }
 
-    // Prepare for token bucket
-    for (auto& buck : bucket)
-    {
-        buck.r = rate * 1024 * 1024 / 8;
-        buck.b = buck.r;
-        buck.n_tokens = 0;
-        //cout << buck.r << ' '<< buck.b << ' ' << buck.n_tokens << '\n';
-    }
-    loginfo << "Token bucket. Using rate " << rate << " Mbit/s, bucket size " << bucket[0].b
-            << " bytes, initial # of tokens " << bucket[0].n_tokens << '\n';
-    //cout << "Initialized bucket 0 to " << bucket[0].r << ' ' << bucket[0].b << ' ' << bucket[0].n_tokens << '\n';
-
     // Initialize counters
 
     *(byte_count+worker_nr) = 0;
     (*(pkt_count+worker_nr)) = 0;
 
-    // The send loop.
+
+    // Set up send queue
+    map<timespec, stream> send_queue;
+    timespec next_send;
     clock_gettime(CLOCK_MONOTONIC, &currtime);
+    for (auto s: streams)
+    {
+        double next_send_dbl = compute_next_send(s.second);
+        dbl2ts(next_send_dbl, next_send);
+        next_send = add_ts(currtime, next_send);
+        send_queue.insert(make_pair(next_send, s.second));
+    }
+
+    // The sendqueue-based send loop
     for (;;)
     {
-        prevtime = currtime;
-        clock_gettime(CLOCK_MONOTONIC, &currtime);
-        replenish_buckets(bucket, prevtime, currtime);
-        for (int i = 0; i < nr_streams; i++)
-        {
-            ev.events = EPOLLOUT | EPOLLET;
-            ev.data.fd = sockets[i];
-            if (bucket[i].n_tokens >= FRAME_SZ*NR_MSGS && bucket[i].in_epoll == false)
-            {
-                //logdebug << "tokens " << bucket[i].n_tokens << " -------Adding stream to epoll\n";
-                if (epoll_ctl(epollfd, EPOLL_CTL_ADD, sockets[i], &ev) == -1)
-                {
-                    throw std::system_error(errno, std::system_category(), FILELINE);
-                }
-                bucket[i].in_epoll = true;
-            }
-            else if (bucket[i].n_tokens < FRAME_SZ*NR_MSGS && bucket[i].in_epoll == true)
-            {
-                //logdebug << "tokens " << bucket[i].n_tokens << " ---------- removing stream from epoll\n";
-                if (epoll_ctl(epollfd, EPOLL_CTL_DEL, sockets[i], nullptr) == -1)
-                {
-                    throw std::system_error(errno, std::system_category(), FILELINE);
-                }
-                bucket[i].in_epoll = false;
-            }
-        }
-        nfds = epoll_pwait(epollfd, events, nr_streams, 100, nullptr);
-        if (nfds == -1)
-        {
-            throw std::system_error(errno, std::system_category(), FILELINE);
-        }
-        for (int i = 0; i < nfds; i++)
-        {
-            sent_bytes = 0;
-            int sid = sock2stream.at(events[i].data.fd);
-            //cout << "sid " << sid << "bucket " << bucket.at(sid).n_tokens << '\n';
-            assert (bucket[sid].n_tokens >= FRAME_SZ*NR_MSGS);
+        auto it = send_queue.begin();
 
-            result = sendmmsg(events[i].data.fd, msg, NR_MSGS, 0);
+        double next_send_dbl = compute_next_send(it->second);
+        dbl2ts(next_send_dbl, next_send);
+        clock_gettime(CLOCK_MONOTONIC, &currtime);
+        next_send = add_ts(currtime, next_send);
+        send_queue.insert(make_pair(next_send, it->second));
+
+        clock_gettime(CLOCK_MONOTONIC, &currtime); // TODO: Maybe good enough to reuse gettime from above, saving a
+                                                   // clock_gettime call?
+        timespec tdiff = subtract_ts(it->first, currtime);
+        if (tdiff.tv_sec > 0 || tdiff.tv_nsec > MILLION)
+        {
+            result = nanosleep(&tdiff, nullptr);
             if (result == -1)
             {
                 throw std::system_error(errno, std::system_category(), FILELINE);
             }
-            else
-            {
-                for (int j = 0; j < result; j++)
-                {
-                    sent_bytes += msg[j].msg_len;
-                }
-                //cout << "Removing " << sent_bytes << "tokens from bucket " << sid << '\n';
-                bucket[sid].n_tokens -= (sent_bytes + result * HDR_SZ);
-
-            }
-            //cout << ".\n";
-            *(byte_count+worker_nr) += sent_bytes;
-            (*(pkt_count+worker_nr))+= result;
         }
+        result = sendmmsg(it->second.sock, msg, NR_MSGS, 0);
+        if (result == -1)
+        {
+                throw std::system_error(errno, std::system_category(), FILELINE);
+        }
+        else
+        {
+            for (int j = 0; j < result; j++)
+            {
+                sent_bytes += msg[j].msg_len;
+            }
+        }
+        *(byte_count+worker_nr) += sent_bytes;
+        (*(pkt_count+worker_nr))+= result;
+
+        // Prepare for next send
+        send_queue.erase(it);
     }
 
     for (int i = 0; i < nr_streams; i++)
