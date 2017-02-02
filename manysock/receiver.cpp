@@ -25,7 +25,7 @@ using std::to_string;
 
 using namespace Netrounds;
 
-const size_t PKT_PAYLOAD = 32;
+const size_t PKT_PAYLOAD = 1472;
 const size_t FRAME_SZ = HDR_SZ + PKT_PAYLOAD;
 const double TP_OVER_GP = (double)FRAME_SZ/PKT_PAYLOAD;
 
@@ -209,7 +209,15 @@ int main(int argc, char *argv[])
                 << ", pkts/s " << ((double)total_pkts)/INTERVAL << ", bits/s " << ((double)total_bytes*8*TP_OVER_GP/INTERVAL)
                 <<'\n';
 
-        rcvbuf_errors = stol(exec("/bin/netstat -s | grep -i rcvbuf | cut -d\':\' -f2"));
+        string output = exec("/bin/netstat -s | grep -i rcvbuf | cut -d\':\' -f2");
+        if (output.size())
+        {
+            rcvbuf_errors = stol(output);
+        }
+        else
+        {
+            rcvbuf_errors = 0;
+        }
         loginfo  << "Nr of netstat rcvbuf errors: " << rcvbuf_errors - rcvbuf_prev_errors << '\n';
         rcvbuf_prev_errors = rcvbuf_errors;
     }
