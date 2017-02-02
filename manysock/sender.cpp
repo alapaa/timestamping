@@ -78,7 +78,8 @@ int sender_thread(string receiver_ip, in_port_t start_port, int nr_streams, int 
     s.packet_size = HDR_SZ + payload_sz;
 
     std::map<int, stream> streams; // Maps from stream id to stream struct
-
+    try
+    {
     for (int i = 0; i < nr_streams; i++)
     {
         sockets[i] = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
@@ -200,7 +201,12 @@ int sender_thread(string receiver_ip, in_port_t start_port, int nr_streams, int 
         // Prepare for next send
         send_queue.erase(it);
     }
-    logdebug << "Sent bytes: " << sent_bytes << " sent_pkts " << result << '\n';
+
+    }
+    catch (std::runtime_error& exc)
+    {
+        logerr << "Got exception " << exc.what() << '\n';
+    }
 
     for (int i = 0; i < nr_streams; i++)
     {
@@ -272,9 +278,13 @@ int main(int argc, char *argv[])
     const int INTERVAL_LENGTH = 10;
     long int sndbuf_errors = 0;
     long int sndbuf_prev_errors = 0;
+    int execution_time = 25;
     for (;;)
     {
         sleep(INTERVAL_LENGTH);
+        execution_time -= INTERVAL_LENGTH;
+        if (execution_time < 0)
+            break;
         seconds += INTERVAL_LENGTH;
         for (int i = 0; i < nr_workers; i++)
         {
@@ -301,6 +311,11 @@ int main(int argc, char *argv[])
         }
         loginfo  << "Nr of netstat sndbuf errors: " << sndbuf_errors - sndbuf_prev_errors << '\n';
         sndbuf_prev_errors = sndbuf_errors;
+    }
+
+    for (auto& t: threads)
+    {
+        t.join();
     }
 
     delete[] pkt_count;
