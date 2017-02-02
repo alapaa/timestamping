@@ -109,8 +109,6 @@ int receiver_thread(string receiver_ip, in_port_t start_port, int nr_streams, co
         }
         for (int i = 0; i < nfds; i++)
         {
-
-            int pktcount_onesock = 0;
             for (;;) // receive all on socket
             {
                 //logdebug << "events[i].data.fd " << events[i].data.fd << ", ";
@@ -128,7 +126,7 @@ int receiver_thread(string receiver_ip, in_port_t start_port, int nr_streams, co
                 }
                 else
                 {
-                    pktcount_onesock++;
+                    assert(recv_bytes == PKT_PAYLOAD);
                     *(byte_count+worker_nr) += recv_bytes;
                     (*(pkt_count+worker_nr))++;
                 }
