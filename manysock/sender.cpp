@@ -35,9 +35,6 @@ atomic<uint64_t> *byte_count;
 atomic<uint64_t> *pkt_count;
 //atomic<uint64_t> *eagain_count;
 
-const size_t PKT_PAYLOAD = 1472;
-const size_t FRAME_SZ = HDR_SZ + PKT_PAYLOAD;
-const double TP_OVER_GP = (double)FRAME_SZ/PKT_PAYLOAD;
 const size_t NR_MSGS = 5;
 const int MEGABIT2BIT = 1048576;
 struct stream
@@ -59,10 +56,11 @@ double compute_next_send(stream s)
  *
  * Implementation of sender worker using send queue instead of e.g. token bucket.
  */
-int sender_thread(string receiver_ip, in_port_t start_port, int nr_streams, const int worker_nr, int bufsz, double rate)
+int sender_thread(string receiver_ip, in_port_t start_port, int nr_streams, int worker_nr, int bufsz, int
+ payload_sz, double rate)
 {
     int sent_bytes;
-    char buf[PKT_PAYLOAD];
+    char buf[payload_sz];
     int result;
     int tmp;
     socklen_t optlen;
@@ -77,7 +75,7 @@ int sender_thread(string receiver_ip, in_port_t start_port, int nr_streams, cons
 
     stream s;
     s.rate = rate * MEGABIT2BIT; // Convert
-    s.packet_size = FRAME_SZ;
+    s.packet_size = HDR_SZ + payload_sz;
 
     std::map<int, stream> streams; // Maps from stream id to stream struct
 
@@ -122,7 +120,7 @@ int sender_thread(string receiver_ip, in_port_t start_port, int nr_streams, cons
     struct iovec msg1;
     memset(&msg1, 0, sizeof(msg1));
     msg1.iov_base = buf;
-    msg1.iov_len = PKT_PAYLOAD;
+    msg1.iov_len = payload_sz;
 
     memset(msg, 0, sizeof(msg));
     for (int i = 0; i < NR_MSGS; i++)
@@ -223,6 +221,7 @@ int main(int argc, char *argv[])
     int nr_streams;
     int nr_workers;
     int bufsz;
+    int payload_sz;
     double rate;
     vector<thread> threads;
 
@@ -230,9 +229,9 @@ int main(int argc, char *argv[])
     uint64_t total_pkts = 0;
     uint64_t total_eagain = 0;
 
-    if (argc != 7)
+    if (argc != 8)
     {
-        cout << "Usage: sender <dest ip> <dest start of port range> <nr streams> <nr worker threads> <wmem_sz [kB]> <rate [Mbit/s]>\n";
+        cout << "Usage: sender <dest ip> <dest start of port range> <nr streams> <nr worker threads> <wmem_sz [kB]> <payload_sz> <rate [Mbit/s]>\n";
         exit(1);
     }
 
@@ -242,10 +241,14 @@ int main(int argc, char *argv[])
     nr_streams = stoi(argv[3]);
     nr_workers = stoi(argv[4]);
     bufsz = stoi(argv[5]);
-    rate = stod(argv[6]);
+    payload_sz = stoi(argv[6]);
+    rate = stod(argv[7]);
     int streams_per_worker = nr_streams / nr_workers;
 
     assert(streams_per_worker > 0);
+
+    const size_t FRAME_SZ = HDR_SZ + payload_sz;
+    const double TP_OVER_GP = (double)FRAME_SZ/payload_sz;
 
     pkt_count = new atomic<uint64_t>[nr_workers];
     byte_count = new atomic<uint64_t>[nr_workers];
@@ -261,6 +264,7 @@ int main(int argc, char *argv[])
                                  streams_per_worker,
                                  i,
                                  bufsz*1024,
+                                 payload_sz,
                                  rate));
     }
 
