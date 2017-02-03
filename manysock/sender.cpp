@@ -43,6 +43,7 @@ struct stream
     int sock;
     double rate; // Unit [bits/s]
     size_t packet_size;
+    timespec next_send;
 };
 
 const int MILLION = 1000000;
@@ -76,6 +77,8 @@ int sender_thread(string receiver_ip, in_port_t start_port, int nr_streams, int 
     stream s;
     s.rate = rate * MEGABIT2BIT; // Convert
     s.packet_size = HDR_SZ + payload_sz;
+
+    logdebug << "Size of stream: " << sizeof(stream) << ", size of timespec: " << sizeof(timespec) << '\n';
 
     std::map<int, stream> streams; // Maps from stream id to stream struct
     try
@@ -138,29 +141,28 @@ int sender_thread(string receiver_ip, in_port_t start_port, int nr_streams, int 
 
     // Set up send queue
     multimap<timespec, stream> send_queue;
-    timespec next_send;
     clock_gettime(CLOCK_MONOTONIC, &currtime);
+    timespec tmp_next_send;
     for (auto s: streams)
     {
         double next_send_dbl = compute_next_send(s.second);
         logdebug << "next_send_dbl: " << next_send_dbl << '\n';
-        dbl2ts(next_send_dbl, next_send);
-        next_send = add_ts(currtime, next_send);
-        send_queue.insert(make_pair(next_send, s.second));
+        dbl2ts(next_send_dbl, s.second.next_send);
+        tmp_next_send = add_ts(currtime, s.second.next_send);
+        send_queue.insert(make_pair(tmp_next_send, s.second));
         logdebug << "Stream rate: " << s.second.rate << '\n';
     }
-    logdebug << "Size of send queue " <<send_queue.size() << '\n';
+    logdebug << "Size of send queue " << send_queue.size() << '\n';
 
     // The sendqueue-based send loop
+    timespec next_send;
     for (;;)
     {
         auto it = send_queue.begin();
 
-        double next_send_dbl = compute_next_send(it->second);
-        dbl2ts(next_send_dbl, next_send);
         //logdebug << "next_send_dbl: " << next_send_dbl << '\n';
         clock_gettime(CLOCK_MONOTONIC, &currtime);
-        next_send = add_ts(it->first, next_send);
+        next_send = add_ts(it->first, it->second.next_send);
         send_queue.insert(make_pair(next_send, it->second));
 
         timespec tdiff = subtract_ts(it->first, currtime);
@@ -175,7 +177,10 @@ int sender_thread(string receiver_ip, in_port_t start_port, int nr_streams, int 
             //logdebug << "Actual sleep length: " << subtract_ts(currtime, oldtime) << '\n';
             if (result == -1)
             {
-                throw std::system_error(errno, std::system_category(), FILELINE);
+                if (errno != EINTR)
+                {
+                    throw std::system_error(errno, std::system_category(), FILELINE);
+                }
             }
         }
         else
