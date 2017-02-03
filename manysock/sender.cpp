@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <cstring>
 #include <unistd.h>
+#include <queue>
 
 #include <sys/epoll.h>
 
@@ -18,7 +19,8 @@
 using std::thread;
 using std::vector;
 using std::map;
-using std::multimap;
+using std::priority_queue;
+using std::pair;
 using std::make_pair;
 using std::cout;
 using std::system_error;
@@ -51,6 +53,17 @@ const int MILLION = 1000000;
 double compute_next_send(stream s)
 {
     return NR_MSGS*s.packet_size*8/s.rate;
+}
+
+bool operator>(const pair<timespec, stream>& p1, const pair<timespec, stream>& p2)
+{
+    const timespec& t1 = p1.first;
+    const timespec& t2 = p2.first;
+    //assert (abs(t1.tv_nsec) < BILLION && abs(t2.tv_nsec) < BILLION);
+    if (t1.tv_sec > t2.tv_sec) return true;
+    if (t1.tv_sec == t2.tv_sec && t1.tv_nsec > t2.tv_nsec) return true;
+    if (t1 == t2 && p1.second.id > p2.second.id) return true;
+    return false;
 }
 
 /*
@@ -140,7 +153,10 @@ int sender_thread(string receiver_ip, in_port_t start_port, int nr_streams, int 
 
 
     // Set up send queue
-    multimap<timespec, stream> send_queue;
+    priority_queue<pair<timespec, stream>,
+                   std::vector<pair<timespec, stream>>,
+                   std::greater<pair<timespec, stream>> > send_queue;
+
     clock_gettime(CLOCK_MONOTONIC, &currtime);
     timespec tmp_next_send;
     for (auto s: streams)
@@ -149,7 +165,7 @@ int sender_thread(string receiver_ip, in_port_t start_port, int nr_streams, int 
         logdebug << "next_send_dbl: " << next_send_dbl << '\n';
         dbl2ts(next_send_dbl, s.second.next_send);
         tmp_next_send = add_ts(currtime, s.second.next_send);
-        send_queue.insert(make_pair(tmp_next_send, s.second));
+        send_queue.push(make_pair(tmp_next_send, s.second));
         logdebug << "Stream rate: " << s.second.rate << '\n';
     }
     logdebug << "Size of send queue " << send_queue.size() << '\n';
@@ -158,23 +174,23 @@ int sender_thread(string receiver_ip, in_port_t start_port, int nr_streams, int 
     timespec next_send;
     for (;;)
     {
-        auto it = send_queue.begin();
+        auto elem = send_queue.top();
+        send_queue.pop();
+        //logdebug << " " << elem.second.id << '\n';
 
-        //logdebug << "next_send_dbl: " << next_send_dbl << '\n';
+        next_send = add_ts(elem.first, elem.second.next_send);
+        send_queue.push(make_pair(next_send, elem.second));
+
         clock_gettime(CLOCK_MONOTONIC, &currtime);
-        next_send = add_ts(it->first, it->second.next_send);
-        send_queue.insert(make_pair(next_send, it->second));
-
-        timespec tdiff = subtract_ts(it->first, currtime);
-        //logdebug << "tdiff " << tdiff << '\n';
+        timespec tdiff = subtract_ts(elem.first, currtime);
+        // cout << "Currtime " << currtime << ", elem " << elem.first << '\n';
+        // if (elem.first < currtime)
+        //     logdebug << "Falling behind!\n";
         if (tdiff.tv_sec > 0 || tdiff.tv_sec == 0 && tdiff.tv_nsec > 1000)
         {
-            //logdebug << "Sleeping\n";
-            //clock_gettime(CLOCK_MONOTONIC, &currtime);
-            if (tdiff.tv_nsec > 100000) tdiff.tv_nsec -= 100000; // Shorten sleeep somewhat to compensate for send overhead
+            if (tdiff.tv_nsec > 100000) tdiff.tv_nsec -= 100000; // Shorten sleeep somewhat to compensate for send
+                                                                 // overhead
             result = nanosleep(&tdiff, nullptr);
-            //timespec oldtime = currtime; clock_gettime(CLOCK_MONOTONIC, &currtime);
-            //logdebug << "Actual sleep length: " << subtract_ts(currtime, oldtime) << '\n';
             if (result == -1)
             {
                 if (errno != EINTR)
@@ -183,12 +199,9 @@ int sender_thread(string receiver_ip, in_port_t start_port, int nr_streams, int 
                 }
             }
         }
-        else
-        {
-            //logdebug << "Send without sleep\n";
-        }
+
         sent_bytes = 0;
-        result = sendmmsg(it->second.sock, msg, NR_MSGS, 0);
+        result = sendmmsg(elem.second.sock, msg, NR_MSGS, 0);
         if (result == -1)
         {
             throw std::system_error(errno, std::system_category(), FILELINE);
@@ -203,8 +216,6 @@ int sender_thread(string receiver_ip, in_port_t start_port, int nr_streams, int 
         *(byte_count+worker_nr) += sent_bytes;
         (*(pkt_count+worker_nr))+= result;
 
-        // Prepare for next send
-        send_queue.erase(it);
     }
 
     }
