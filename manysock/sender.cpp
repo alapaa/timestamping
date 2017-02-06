@@ -96,130 +96,130 @@ int sender_thread(string receiver_ip, in_port_t start_port, int nr_streams, int 
     std::map<int, stream> streams; // Maps from stream id to stream struct
     try
     {
-    for (int i = 0; i < nr_streams; i++)
-    {
-        sockets[i] = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-        if (sockets[i] == -1)
+        for (int i = 0; i < nr_streams; i++)
         {
-            throw std::system_error(errno, std::system_category(), FILELINE);
-        }
-        s.id = i;
-        s.sock = sockets[i];
-        streams.insert(make_pair(i, s));
+            sockets[i] = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+            if (sockets[i] == -1)
+            {
+                throw std::system_error(errno, std::system_category(), FILELINE);
+            }
+            s.id = i;
+            s.sock = sockets[i];
+            streams.insert(make_pair(i, s));
 
-        raddr.sin_port = ntohs(start_port + i);
-        result = connect(sockets[i], (sockaddr *)&raddr, sizeof(raddr));
-        if (result == -1)
-        {
-            throw std::system_error(errno, std::system_category(), FILELINE);
-        }
-        set_nonblocking(sockets[i]);
-        result = setsockopt(sockets[i], SOL_SOCKET, SO_SNDBUF, (const char *)&bufsz, sizeof(bufsz));
-        if (result == -1)
-        {
-            throw std::system_error(errno, std::system_category(), FILELINE);
-        }
-
-        bufsz = 0;
-        optlen = sizeof(bufsz);
-        result = getsockopt(sockets[i], SOL_SOCKET, SO_SNDBUF, (char *)&bufsz, &optlen);
-        if (result == -1)
-        {
-            throw std::system_error(errno, std::system_category(), FILELINE);
-        }
-        if (worker_nr == 0 && i == 0) logdebug << "Got buffer size " << bufsz << '\n';
-    }
-
-    logdebug << "nr streams in map: " << streams.size() << '\n';
-
-    // Prepare for sendmmsg
-    struct mmsghdr msg[NR_MSGS];
-    struct iovec msg1;
-    memset(&msg1, 0, sizeof(msg1));
-    msg1.iov_base = buf;
-    msg1.iov_len = payload_sz;
-
-    memset(msg, 0, sizeof(msg));
-    for (int i = 0; i < NR_MSGS; i++)
-    {
-        msg[i].msg_hdr.msg_iov = &msg1;
-        msg[i].msg_hdr.msg_iovlen = 1;
-    }
-
-    // Initialize counters
-
-    *(byte_count+worker_nr) = 0;
-    (*(pkt_count+worker_nr)) = 0;
-
-
-    // Set up send queue
-    priority_queue<pair<timespec, stream>,
-                   std::vector<pair<timespec, stream>>,
-                   std::greater<pair<timespec, stream>> > send_queue;
-
-    clock_gettime(CLOCK_MONOTONIC, &currtime);
-    timespec tmp_next_send;
-    for (auto s: streams)
-    {
-        double next_send_dbl = compute_next_send(s.second);
-        logdebug << "next_send_dbl: " << next_send_dbl << '\n';
-        dbl2ts(next_send_dbl, s.second.next_send);
-        tmp_next_send = add_ts(currtime, s.second.next_send);
-        send_queue.push(make_pair(tmp_next_send, s.second));
-        logdebug << "Stream rate: " << s.second.rate << '\n';
-    }
-    logdebug << "Size of send queue " << send_queue.size() << '\n';
-
-    // The sendqueue-based send loop
-    timespec next_send;
-    for (;;)
-    {
-        auto elem = send_queue.top();
-        send_queue.pop();
-        //logdebug << " " << elem.second.id << '\n';
-
-        next_send = add_ts(elem.first, elem.second.next_send);
-        // timespec before, after;
-        // clock_gettime(CLOCK_MONOTONIC, &before);
-        send_queue.push(make_pair(next_send, elem.second));
-        // clock_gettime(CLOCK_MONOTONIC, &after);
-        // logdebug << "Time diff" << subtract_ts(after, before) << '\n';
-        clock_gettime(CLOCK_MONOTONIC, &currtime);
-        timespec tdiff = subtract_ts(elem.first, currtime);
-        // cout << "Currtime " << currtime << ", elem " << elem.first << '\n';
-        // if (elem.first < currtime)
-        //     logdebug << "Falling behind!\n";
-        if (tdiff.tv_sec > 0 || tdiff.tv_sec == 0 && tdiff.tv_nsec > 1000)
-        {
-            if (tdiff.tv_nsec > 100000) tdiff.tv_nsec -= 100000; // Shorten sleeep somewhat to compensate for send
-                                                                 // overhead
-            result = nanosleep(&tdiff, nullptr);
+            raddr.sin_port = ntohs(start_port + i);
+            result = connect(sockets[i], (sockaddr *)&raddr, sizeof(raddr));
             if (result == -1)
             {
-                if (errno != EINTR)
+                throw std::system_error(errno, std::system_category(), FILELINE);
+            }
+            set_nonblocking(sockets[i]);
+            result = setsockopt(sockets[i], SOL_SOCKET, SO_SNDBUF, (const char *)&bufsz, sizeof(bufsz));
+            if (result == -1)
+            {
+                throw std::system_error(errno, std::system_category(), FILELINE);
+            }
+
+            bufsz = 0;
+            optlen = sizeof(bufsz);
+            result = getsockopt(sockets[i], SOL_SOCKET, SO_SNDBUF, (char *)&bufsz, &optlen);
+            if (result == -1)
+            {
+                throw std::system_error(errno, std::system_category(), FILELINE);
+            }
+            if (worker_nr == 0 && i == 0) logdebug << "Got buffer size " << bufsz << '\n';
+        }
+
+        logdebug << "nr streams in map: " << streams.size() << '\n';
+
+        // Prepare for sendmmsg
+        struct mmsghdr msg[NR_MSGS];
+        struct iovec msg1;
+        memset(&msg1, 0, sizeof(msg1));
+        msg1.iov_base = buf;
+        msg1.iov_len = payload_sz;
+
+        memset(msg, 0, sizeof(msg));
+        for (int i = 0; i < NR_MSGS; i++)
+        {
+            msg[i].msg_hdr.msg_iov = &msg1;
+            msg[i].msg_hdr.msg_iovlen = 1;
+        }
+
+        // Initialize counters
+
+        *(byte_count+worker_nr) = 0;
+        (*(pkt_count+worker_nr)) = 0;
+
+
+        // Set up send queue
+        priority_queue<pair<timespec, stream>,
+                       std::vector<pair<timespec, stream>>,
+                       std::greater<pair<timespec, stream>> > send_queue;
+
+        clock_gettime(CLOCK_MONOTONIC, &currtime);
+        timespec tmp_next_send;
+        for (auto s: streams)
+        {
+            double next_send_dbl = compute_next_send(s.second);
+            logdebug << "next_send_dbl: " << next_send_dbl << '\n';
+            dbl2ts(next_send_dbl, s.second.next_send);
+            tmp_next_send = add_ts(currtime, s.second.next_send);
+            send_queue.push(make_pair(tmp_next_send, s.second));
+            logdebug << "Stream rate: " << s.second.rate << '\n';
+        }
+        logdebug << "Size of send queue " << send_queue.size() << '\n';
+
+        // The sendqueue-based send loop
+        timespec next_send;
+        for (;;)
+        {
+            auto elem = send_queue.top();
+            send_queue.pop();
+            //logdebug << " " << elem.second.id << '\n';
+
+            next_send = add_ts(elem.first, elem.second.next_send);
+            // timespec before, after;
+            // clock_gettime(CLOCK_MONOTONIC, &before);
+            send_queue.push(make_pair(next_send, elem.second));
+            // clock_gettime(CLOCK_MONOTONIC, &after);
+            // logdebug << "Time diff" << subtract_ts(after, before) << '\n';
+            clock_gettime(CLOCK_MONOTONIC, &currtime);
+            timespec tdiff = subtract_ts(elem.first, currtime);
+            // cout << "Currtime " << currtime << ", elem " << elem.first << '\n';
+            // if (elem.first < currtime)
+            //     logdebug << "Falling behind!\n";
+            if (tdiff.tv_sec > 0 || tdiff.tv_sec == 0 && tdiff.tv_nsec > 1000)
+            {
+                if (tdiff.tv_nsec > 100000) tdiff.tv_nsec -= 100000; // Shorten sleeep somewhat to compensate for send
+                // overhead
+                result = nanosleep(&tdiff, nullptr);
+                if (result == -1)
                 {
-                    throw std::system_error(errno, std::system_category(), FILELINE);
+                    if (errno != EINTR)
+                    {
+                        throw std::system_error(errno, std::system_category(), FILELINE);
+                    }
                 }
             }
-        }
 
-        sent_bytes = 0;
-        result = sendmmsg(elem.second.sock, msg, NR_MSGS, 0);
-        if (result == -1)
-        {
-            throw std::system_error(errno, std::system_category(), FILELINE);
-        }
-        else
-        {
-            for (int j = 0; j < result; j++)
+            sent_bytes = 0;
+            result = sendmmsg(elem.second.sock, msg, NR_MSGS, 0);
+            if (result == -1)
             {
-                sent_bytes += msg[j].msg_len;
+                throw std::system_error(errno, std::system_category(), FILELINE);
             }
-        }
-        *(byte_count+worker_nr) += sent_bytes;
-        (*(pkt_count+worker_nr))+= result;
+            else
+            {
+                for (int j = 0; j < result; j++)
+                {
+                    sent_bytes += msg[j].msg_len;
+                }
+            }
+            *(byte_count+worker_nr) += sent_bytes;
+            (*(pkt_count+worker_nr))+= result;
 
-    }
+        }
 
     }
     catch (std::runtime_error& exc)
