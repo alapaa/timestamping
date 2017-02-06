@@ -55,7 +55,7 @@ double compute_next_send(stream s)
     return NR_MSGS*s.packet_size*8/s.rate;
 }
 
-bool operator>(const pair<timespec, stream>& p1, const pair<timespec, stream>& p2)
+inline bool operator>(const pair<timespec, stream>& p1, const pair<timespec, stream>& p2)
 {
     const timespec& t1 = p1.first;
     const timespec& t2 = p2.first;
@@ -179,8 +179,11 @@ int sender_thread(string receiver_ip, in_port_t start_port, int nr_streams, int 
         //logdebug << " " << elem.second.id << '\n';
 
         next_send = add_ts(elem.first, elem.second.next_send);
+        // timespec before, after;
+        // clock_gettime(CLOCK_MONOTONIC, &before);
         send_queue.push(make_pair(next_send, elem.second));
-
+        // clock_gettime(CLOCK_MONOTONIC, &after);
+        // logdebug << "Time diff" << subtract_ts(after, before) << '\n';
         clock_gettime(CLOCK_MONOTONIC, &currtime);
         timespec tdiff = subtract_ts(elem.first, currtime);
         // cout << "Currtime " << currtime << ", elem " << elem.first << '\n';

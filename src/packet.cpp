@@ -38,14 +38,6 @@ template<class T1> T1 serialize(T1 val)
 
 }
 
-inline bool operator<(const timespec& t1, const timespec& t2)
-{
-//    assert (abs(t1.tv_nsec) < BILLION && abs(t2.tv_nsec) < BILLION);
-    if (t1.tv_sec < t2.tv_sec) return true;
-    if (t1.tv_sec == t2.tv_sec && t1.tv_nsec < t2.tv_nsec) return true;
-    return false;
-}
-
 namespace Netrounds
 {
 
