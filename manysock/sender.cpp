@@ -194,8 +194,6 @@ int sender_thread(string receiver_ip, in_port_t start_port, int nr_streams, int 
             //     logdebug << "Falling behind!\n";
             if (tdiff.tv_sec > 0 || tdiff.tv_sec == 0 && tdiff.tv_nsec > 10000)
             {
-                if (tdiff.tv_nsec > 100000) tdiff.tv_nsec -= 100000; // Shorten sleeep somewhat to compensate for send
-                // overhead
                 result = nanosleep(&tdiff, nullptr);
                 if (result == -1)
                 {
