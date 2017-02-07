@@ -37,7 +37,7 @@ atomic<uint64_t> *byte_count;
 atomic<uint64_t> *pkt_count;
 //atomic<uint64_t> *eagain_count;
 
-const size_t NR_MSGS = 5;
+const size_t NR_MSGS = 20;
 const int MEGABIT2BIT = 1048576;
 struct stream
 {
@@ -192,7 +192,7 @@ int sender_thread(string receiver_ip, in_port_t start_port, int nr_streams, int 
             // cout << "Currtime " << currtime << ", elem " << elem.first << '\n';
             // if (elem.first < currtime)
             //     logdebug << "Falling behind!\n";
-            if (tdiff.tv_sec > 0 || tdiff.tv_sec == 0 && tdiff.tv_nsec > 1000)
+            if (tdiff.tv_sec > 0 || tdiff.tv_sec == 0 && tdiff.tv_nsec > 10000)
             {
                 if (tdiff.tv_nsec > 100000) tdiff.tv_nsec -= 100000; // Shorten sleeep somewhat to compensate for send
                 // overhead
