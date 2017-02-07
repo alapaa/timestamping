@@ -183,7 +183,7 @@ int sender_thread(string receiver_ip, in_port_t start_port, int nr_streams, int 
 
             //timespec before, after;
             //clock_gettime(CLOCK_MONOTONIC, &before);
-            send_queue.push(make_pair(next_send, elem.second));
+            send_queue.emplace(make_pair(next_send, elem.second));
             //clock_gettime(CLOCK_MONOTONIC, &after);
             //logdebug << "Time diff" << subtract_ts(after, before) << '\n';
             clock_gettime(CLOCK_MONOTONIC, &currtime);
@@ -236,6 +236,8 @@ int sender_thread(string receiver_ip, in_port_t start_port, int nr_streams, int 
             throw std::system_error(errno, std::system_category(), FILELINE);
         }
     }
+
+    loginfo << "Thread #" << std::this_thread::get_id() << " exiting\n";
 
     return 0;
 }
@@ -333,9 +335,13 @@ int main(int argc, char *argv[])
         sndbuf_prev_errors = sndbuf_errors;
     }
 
+
+    loginfo << "Main prog: joining threads\n";
     for (auto& t: threads)
     {
+        loginfo << "Joining thread #" << std::this_thread::get_id() << '\n';
         t.join();
+        loginfo << "Joined.\n";
     }
 
     delete[] pkt_count;
