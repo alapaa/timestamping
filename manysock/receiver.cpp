@@ -25,7 +25,7 @@ using std::to_string;
 
 using namespace Netrounds;
 
-const size_t PKT_PAYLOAD = 1472;
+const size_t PKT_PAYLOAD = 32;
 const size_t FRAME_SZ = HDR_SZ + PKT_PAYLOAD;
 const double TP_OVER_GP = (double)FRAME_SZ/PKT_PAYLOAD;
 
@@ -34,7 +34,7 @@ atomic<uint64_t> *pkt_count;
 
 int receiver_thread(string receiver_ip, in_port_t start_port, int nr_streams, const int worker_nr)
 {
-    char buf[PKT_PAYLOAD];
+    char buf[10000];
     int result;
     int tmp;
     int recv_bytes;
@@ -43,7 +43,7 @@ int receiver_thread(string receiver_ip, in_port_t start_port, int nr_streams, co
     struct epoll_event events[nr_streams];
     int epollfd;
     int nfds;
-    int bufsz = 1000000;
+    int bufsz = 10000000;
     socklen_t optlen;
 
     vector<int> sockets(nr_streams);
