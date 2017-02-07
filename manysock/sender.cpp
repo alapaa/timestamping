@@ -55,14 +55,14 @@ double compute_next_send(stream s)
     return NR_MSGS*s.packet_size*8/s.rate;
 }
 
-inline bool operator>(const pair<timespec, stream>& p1, const pair<timespec, stream>& p2)
+inline bool operator>(const pair<timespec, int>& p1, const pair<timespec, int>& p2)
 {
     const timespec& t1 = p1.first;
     const timespec& t2 = p2.first;
     //assert (abs(t1.tv_nsec) < BILLION && abs(t2.tv_nsec) < BILLION);
     if (t1.tv_sec > t2.tv_sec) return true;
     if (t1.tv_sec == t2.tv_sec && t1.tv_nsec > t2.tv_nsec) return true;
-    if (t1 == t2 && p1.second.id > p2.second.id) return true;
+    if (t1 == t2 && p1.second > p2.second) return true;
     return false;
 }
 
@@ -152,20 +152,21 @@ int sender_thread(string receiver_ip, in_port_t start_port, int nr_streams, int 
         (*(pkt_count+worker_nr)) = 0;
 
 
-        // Set up send queue
-        priority_queue<pair<timespec, stream>,
-                       std::vector<pair<timespec, stream>>,
-                       std::greater<pair<timespec, stream>> > send_queue;
+        // Set up send queue. NOTE: For good performance of the underlying min-heap, elements need to be small, since
+        // they are copied frequently while re-heapifying.
+        priority_queue<pair<timespec, int>,
+                       std::vector<pair<timespec, int>>,
+                       std::greater<pair<timespec, int>> > send_queue;
 
         clock_gettime(CLOCK_MONOTONIC, &currtime);
         timespec tmp_next_send;
-        for (auto s: streams)
+        for (auto& s: streams)
         {
             double next_send_dbl = compute_next_send(s.second);
             logdebug << "next_send_dbl: " << next_send_dbl << '\n';
             dbl2ts(next_send_dbl, s.second.next_send);
             tmp_next_send = add_ts(currtime, s.second.next_send);
-            send_queue.push(make_pair(tmp_next_send, s.second));
+            send_queue.push(make_pair(tmp_next_send, s.second.id));
             logdebug << "Stream rate: " << s.second.rate << '\n';
         }
         logdebug << "Size of send queue " << send_queue.size() << '\n';
@@ -177,14 +178,16 @@ int sender_thread(string receiver_ip, in_port_t start_port, int nr_streams, int 
             auto elem = send_queue.top();
             send_queue.pop();
             //logdebug << " " << elem.second.id << '\n';
+            stream s = streams[elem.second];
+            next_send = add_ts(elem.first, s.next_send);
 
-            next_send = add_ts(elem.first, elem.second.next_send);
-            // timespec before, after;
-            // clock_gettime(CLOCK_MONOTONIC, &before);
+            //timespec before, after;
+            //clock_gettime(CLOCK_MONOTONIC, &before);
             send_queue.push(make_pair(next_send, elem.second));
-            // clock_gettime(CLOCK_MONOTONIC, &after);
-            // logdebug << "Time diff" << subtract_ts(after, before) << '\n';
+            //clock_gettime(CLOCK_MONOTONIC, &after);
+            //logdebug << "Time diff" << subtract_ts(after, before) << '\n';
             clock_gettime(CLOCK_MONOTONIC, &currtime);
+            //logdebug << "ns: " << subtract_ts(next_send, currtime) << '\n';
             timespec tdiff = subtract_ts(elem.first, currtime);
             // cout << "Currtime " << currtime << ", elem " << elem.first << '\n';
             // if (elem.first < currtime)
@@ -204,7 +207,7 @@ int sender_thread(string receiver_ip, in_port_t start_port, int nr_streams, int 
             }
 
             sent_bytes = 0;
-            result = sendmmsg(elem.second.sock, msg, NR_MSGS, 0);
+            result = sendmmsg(s.sock, msg, NR_MSGS, 0);
             if (result == -1)
             {
                 throw std::system_error(errno, std::system_category(), FILELINE);
