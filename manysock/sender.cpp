@@ -55,17 +55,6 @@ double compute_next_send(stream s)
     return NR_MSGS*s.packet_size*8/s.rate;
 }
 
-inline bool operator>(const pair<timespec, int>& p1, const pair<timespec, int>& p2)
-{
-    const timespec& t1 = p1.first;
-    const timespec& t2 = p2.first;
-    //assert (abs(t1.tv_nsec) < BILLION && abs(t2.tv_nsec) < BILLION);
-    if (t1.tv_sec > t2.tv_sec) return true;
-    if (t1.tv_sec == t2.tv_sec && t1.tv_nsec > t2.tv_nsec) return true;
-    if (t1 == t2 && p1.second > p2.second) return true;
-    return false;
-}
-
 /*
  *
  * Implementation of sender worker using send queue instead of e.g. token bucket.
@@ -300,7 +289,7 @@ int main(int argc, char *argv[])
     const int INTERVAL_LENGTH = 10;
     long int sndbuf_errors = 0;
     long int sndbuf_prev_errors = 0;
-    int execution_time = 25;
+    int execution_time = 300;
     for (;;)
     {
         sleep(INTERVAL_LENGTH);
