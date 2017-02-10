@@ -6,6 +6,8 @@
 
 #include <cstdint>
 
+const int BILLION = 1000000000; // Swedish "miljard"
+
 bool operator<(const timespec& t1, const timespec& t2);
 
 inline bool operator<(const timespec& t1, const timespec& t2)
@@ -55,6 +57,46 @@ struct ReflectorPacket
     timestamp_t t3_sec;
     timestamp_t t3_nsec;
 };
+
+inline timespec subtract_ts(const timespec& newer, const timespec& older)
+{
+    timespec result;
+
+    if ((newer.tv_nsec - older.tv_nsec) < 0)
+    {
+        result.tv_sec = newer.tv_sec - older.tv_sec - 1;
+        result.tv_nsec = newer.tv_nsec - older.tv_nsec + BILLION;
+    }
+    else
+    {
+        result.tv_sec = newer.tv_sec - older.tv_sec;
+        result.tv_nsec = newer.tv_nsec - older.tv_nsec;
+    }
+
+    return result;
+}
+
+inline timespec add_ts(const timespec& t1, const timespec& t2)
+{
+    assert(t1.tv_nsec >= 0 && t2.tv_nsec >= 0);
+
+    timespec result {0, 0};
+    int tmp = t1.tv_nsec + t2.tv_nsec;
+    assert (tmp < BILLION*2);
+    if (tmp > BILLION)
+    {
+        result.tv_sec += t1.tv_sec + t2.tv_sec + 1;
+        result.tv_nsec = tmp - BILLION;
+    }
+    else
+    {
+        result.tv_sec += t1.tv_sec + t2.tv_sec;
+        result.tv_nsec = tmp;
+    }
+
+    return result;
+}
+
 
 bool operator==(const timespec& t1, const timespec& t2);
 bool operator!=(const timespec& t1, const timespec& t2);

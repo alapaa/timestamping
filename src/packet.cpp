@@ -19,8 +19,6 @@ using std::shared_ptr;
 using std::tuple;
 using std::string;
 
-const int BILLION = 1000000000; // Swedish "miljard"
-
 template<class T1> T1 serialize(T1 val)
 {
     if (sizeof(T1) == sizeof(uint32_t))
@@ -90,45 +88,6 @@ string ts2string(const timespec& ts)
 ostream& operator<<(ostream& os, const timespec& ts)
 {
     return os << ts2string(ts);
-}
-
-timespec subtract_ts(const timespec& newer, const timespec& older)
-{
-    timespec result;
-
-    if ((newer.tv_nsec - older.tv_nsec) < 0)
-    {
-        result.tv_sec = newer.tv_sec - older.tv_sec - 1;
-        result.tv_nsec = newer.tv_nsec - older.tv_nsec + BILLION;
-    }
-    else
-    {
-        result.tv_sec = newer.tv_sec - older.tv_sec;
-        result.tv_nsec = newer.tv_nsec - older.tv_nsec;
-    }
-
-    return result;
-}
-
-timespec add_ts(const timespec& t1, const timespec& t2)
-{
-    assert(t1.tv_nsec >= 0 && t2.tv_nsec >= 0);
-
-    timespec result {0, 0};
-    int tmp = t1.tv_nsec + t2.tv_nsec;
-    assert (tmp < BILLION*2);
-    if (tmp > BILLION)
-    {
-        result.tv_sec += t1.tv_sec + t2.tv_sec + 1;
-        result.tv_nsec = tmp - BILLION;
-    }
-    else
-    {
-        result.tv_sec += t1.tv_sec + t2.tv_sec;
-        result.tv_nsec = tmp;
-    }
-
-    return result;
 }
 
 timespec make_timespec(timestamp_t tv_sec, timestamp_t tv_nsec)
