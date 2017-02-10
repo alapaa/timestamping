@@ -6,13 +6,10 @@
 
 #include <cassert>
 
-#include <packet.h>
-
 using std::make_heap;
 using std::pop_heap;
 using std::vector;
 using std::greater;
-using std::less;
 
 // IMPORTANT: For good performance of the underlying min-heap, the q elements (type T) should be small!
 
@@ -25,32 +22,15 @@ public:
     size_t size() const;
 private:
     std::vector<T> elems_;
-    T biggest;
 };
 
 template <class T> SendQueue<T>::SendQueue(const vector<T>& elems) : elems_(elems)
 {
     make_heap(elems_.begin(), elems_.end(), greater<T>());
-    biggest = *max_element(elems_.begin(), elems_.end(), less<T>());
 }
 
 template <class T> void SendQueue<T>::pop_and_insert(const T& new_elem)
 {
-    //if (elems_.size() >= 3 && elems_[1] > new_elem && elems_[2] > new_elem)
-    if (elems_.size() >= 3 && greater<T>()(elems_[1], new_elem) && greater<T>()(elems_[2], new_elem))
-    {
-        elems_[0] = new_elem;
-        //assert(std::is_heap(elems_.begin(), elems_.end(), greater<T>()));
-        return;
-    }
-
-    // if (greater<T>()(new_elem, biggest))
-    // {
-    //     biggest = new_elem;
-    //     elems_.push_back(new_elem);
-    //     //assert(std::is_heap(elems_.begin(), elems_.end(), greater<T>()));
-    //     return;
-    // }
     elems_.push_back(new_elem);
     pop_heap(elems_.begin(), elems_.end(), greater<T>());
     elems_.pop_back();

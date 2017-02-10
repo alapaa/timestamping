@@ -56,19 +56,6 @@ double compute_next_send(stream s)
     return NR_MSGS*s.packet_size*8/s.rate;
 }
 
-// const inline bool operator>(const QElem& lhs, const QElem& rhs)
-// {
-//     if (lhs.first < rhs.first) return false;
-//     if (lhs.first == rhs.first)
-//     {
-//         if (lhs.second <= lhs.second)
-//             return false;
-//         else
-//             return true;
-//     }
-//     return true;
-// }
-
 /*
  *
  * Implementation of sender worker using send queue instead of e.g. token bucket.
@@ -161,14 +148,8 @@ int sender_thread(string receiver_ip, in_port_t start_port, int nr_streams, int 
         clock_gettime(CLOCK_MONOTONIC, &currtime);
         timespec tmp_next_send;
         vector<QElem> elems;
-        int i = 0;
         for (auto& s: streams)
         {
-            if (i == 0)
-            {
-                s.second.rate = 100*MILLION;
-            }
-            i++;
             double next_send_dbl = compute_next_send(s.second);
             logdebug << "next_send_dbl: " << next_send_dbl << '\n';
             dbl2ts(next_send_dbl, s.second.next_send);
