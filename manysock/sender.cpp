@@ -8,18 +8,17 @@
 #include <cstdint>
 #include <cstring>
 #include <unistd.h>
-#include <queue>
 
 #include <sys/epoll.h>
 
 #include "util.h"
 #include "packet.h"
+#include "send_queue.h"
 #include "logging.h"
 
 using std::thread;
 using std::vector;
 using std::map;
-using std::priority_queue;
 using std::pair;
 using std::make_pair;
 using std::cout;
@@ -32,6 +31,8 @@ using std::to_string;
 using std::min;
 
 using namespace Netrounds;
+
+typedef std::pair<timespec, int> QElem;
 
 atomic<uint64_t> *byte_count;
 atomic<uint64_t> *pkt_count;
@@ -54,6 +55,19 @@ double compute_next_send(stream s)
 {
     return NR_MSGS*s.packet_size*8/s.rate;
 }
+
+// const inline bool operator>(const QElem& lhs, const QElem& rhs)
+// {
+//     if (lhs.first < rhs.first) return false;
+//     if (lhs.first == rhs.first)
+//     {
+//         if (lhs.second <= lhs.second)
+//             return false;
+//         else
+//             return true;
+//     }
+//     return true;
+// }
 
 /*
  *
@@ -143,36 +157,40 @@ int sender_thread(string receiver_ip, in_port_t start_port, int nr_streams, int 
 
         // Set up send queue. NOTE: For good performance of the underlying min-heap, elements need to be small, since
         // they are copied frequently while re-heapifying.
-        priority_queue<pair<timespec, int>,
-                       std::vector<pair<timespec, int>>,
-                       std::greater<pair<timespec, int>> > send_queue;
 
         clock_gettime(CLOCK_MONOTONIC, &currtime);
         timespec tmp_next_send;
+        vector<QElem> elems;
+        int i = 0;
         for (auto& s: streams)
         {
+            if (i == 0)
+            {
+                s.second.rate = 100*MILLION;
+            }
+            i++;
             double next_send_dbl = compute_next_send(s.second);
             logdebug << "next_send_dbl: " << next_send_dbl << '\n';
             dbl2ts(next_send_dbl, s.second.next_send);
             tmp_next_send = add_ts(currtime, s.second.next_send);
-            send_queue.push(make_pair(tmp_next_send, s.second.id));
+            elems.emplace_back(make_pair(tmp_next_send, s.second.id));
             logdebug << "Stream rate: " << s.second.rate << '\n';
         }
+        SendQueue<QElem> send_queue(elems);
         logdebug << "Size of send queue " << send_queue.size() << '\n';
 
         // The sendqueue-based send loop
         timespec next_send;
         for (;;)
         {
-            auto elem = send_queue.top();
-            send_queue.pop();
+            auto elem = send_queue.front();
             //logdebug << " " << elem.second.id << '\n';
             stream s = streams[elem.second];
             next_send = add_ts(elem.first, s.next_send);
 
             //timespec before, after;
             //clock_gettime(CLOCK_MONOTONIC, &before);
-            send_queue.emplace(make_pair(next_send, elem.second));
+            send_queue.pop_and_insert(make_pair(next_send, elem.second));
             //clock_gettime(CLOCK_MONOTONIC, &after);
             //logdebug << "Time diff" << subtract_ts(after, before) << '\n';
             clock_gettime(CLOCK_MONOTONIC, &currtime);
