@@ -3,7 +3,6 @@
 
 #include <algorithm>
 #include <vector>
-
 #include <cassert>
 
 using std::make_heap;
@@ -31,6 +30,14 @@ template <class T> SendQueue<T>::SendQueue(const vector<T>& elems) : elems_(elem
 
 template <class T> void SendQueue<T>::pop_and_insert(const T& new_elem)
 {
+    // Optimize common case of inserting at top of heap (e.g. if one stream is much higher rate than the others.
+    if (elems_.size() >= 3 && greater<T>()(elems_[1], new_elem) && greater<T>()(elems_[2], new_elem))
+    {
+        elems_[0] = new_elem;
+        //assert(std::is_heap(elems_.begin(), elems_.end(), greater<T>()));
+        return;
+    }
+
     elems_.push_back(new_elem);
     pop_heap(elems_.begin(), elems_.end(), greater<T>());
     elems_.pop_back();
