@@ -1,7 +1,6 @@
 #include <iostream>
 #include <thread>
 #include <vector>
-#include <map>
 #include <cassert>
 #include <system_error>
 #include <atomic>
@@ -18,7 +17,6 @@
 
 using std::thread;
 using std::vector;
-using std::map;
 using std::pair;
 using std::make_pair;
 using std::cout;
@@ -38,7 +36,7 @@ atomic<uint64_t> *byte_count;
 atomic<uint64_t> *pkt_count;
 //atomic<uint64_t> *eagain_count;
 
-const size_t NR_MSGS = 20;
+const size_t NR_MSGS = 1;
 const int MEGABIT2BIT = 1048576;
 struct stream
 {
@@ -83,7 +81,7 @@ int sender_thread(string receiver_ip, in_port_t start_port, int nr_streams, int 
 
     logdebug << "Size of stream: " << sizeof(stream) << ", size of timespec: " << sizeof(timespec) << '\n';
 
-    std::map<int, stream> streams; // Maps from stream id to stream struct
+    vector<stream> streams; // Maps from stream id to stream struct
     try
     {
         for (int i = 0; i < nr_streams; i++)
@@ -95,7 +93,7 @@ int sender_thread(string receiver_ip, in_port_t start_port, int nr_streams, int 
             }
             s.id = i;
             s.sock = sockets[i];
-            streams.insert(make_pair(i, s));
+            streams.push_back(s);
 
             raddr.sin_port = ntohs(start_port + i);
             result = connect(sockets[i], (sockaddr *)&raddr, sizeof(raddr));
@@ -150,12 +148,12 @@ int sender_thread(string receiver_ip, in_port_t start_port, int nr_streams, int 
         vector<QElem> elems;
         for (auto& s: streams)
         {
-            double next_send_dbl = compute_next_send(s.second);
+            double next_send_dbl = compute_next_send(s);
             logdebug << "next_send_dbl: " << next_send_dbl << '\n';
-            dbl2ts(next_send_dbl, s.second.next_send);
-            tmp_next_send = add_ts(currtime, s.second.next_send);
-            elems.emplace_back(make_pair(tmp_next_send, s.second.id));
-            logdebug << "Stream rate: " << s.second.rate << '\n';
+            dbl2ts(next_send_dbl, s.next_send);
+            tmp_next_send = add_ts(currtime, s.next_send);
+            elems.emplace_back(make_pair(tmp_next_send, s.id));
+            logdebug << "Stream rate: " << s.rate << '\n';
         }
         SendQueue<QElem> send_queue(elems);
         logdebug << "Size of send queue " << send_queue.size() << '\n';
@@ -288,7 +286,7 @@ int main(int argc, char *argv[])
     const int INTERVAL_LENGTH = 10;
     long int sndbuf_errors = 0;
     long int sndbuf_prev_errors = 0;
-    int execution_time = 300;
+    int execution_time = 30;
     for (;;)
     {
         sleep(INTERVAL_LENGTH);
